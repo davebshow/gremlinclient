@@ -1,8 +1,7 @@
 import unittest
 import trollius
 from tornado.platform.asyncio import AsyncIOMainLoop
-from tornado.platform.asyncio import to_asyncio_future
-from gremlinclient import submit
+from gremlinclient import aiosubmit
 
 
 class TrolliusSyntaxTest(unittest.TestCase):
@@ -15,11 +14,10 @@ class TrolliusSyntaxTest(unittest.TestCase):
 
         @trollius.coroutine
         def go():
-            f = submit("1 + 1")
-            f = to_asyncio_future(f)
+            f = aiosubmit("1 + 1")
             resp = yield trollius.From(f)
             while True:
-                msg = to_asyncio_future(resp.read())
+                msg = resp.read()
                 msg = yield trollius.From(msg)
                 if msg is None:
                     break

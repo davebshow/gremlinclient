@@ -15,7 +15,7 @@ Message = collections.namedtuple(
     ["status_code", "data", "message", "metadata"])
 
 
-class GremlinClient:
+class GremlinClient(object):
     """Main interface for interacting with the Gremlin Server.
     :param str url: url for Gremlin Server (optional). 'http://localhost:8182/'
         by default
@@ -40,6 +40,7 @@ class GremlinClient:
         self._timeout = timeout
         self._username = username
         self._password = password
+        self._response = GremlinResponse
 
     @property
     def processor(self):
@@ -117,14 +118,14 @@ class GremlinClient:
         def send_message(f):
             conn = f.result()
             conn.write_message(message)
-            future.set_result(GremlinResponse(conn))
+            future.set_result(self._response(conn))
 
         future_conn.add_done_callback(send_message)
 
         return future
 
 
-class GremlinResponse:
+class GremlinResponse(object):
 
     def __init__(self, conn, session=None, loop=None, username="",
                  password=""):

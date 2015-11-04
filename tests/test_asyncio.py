@@ -2,8 +2,7 @@ import unittest
 import asyncio
 from tornado.websocket import WebSocketClientConnection
 from tornado.platform.asyncio import AsyncIOMainLoop
-from tornado.platform.asyncio import to_asyncio_future
-from gremlinclient import submit
+from gremlinclient import aiosubmit
 
 
 class AsyncioSyntaxTest(unittest.TestCase):
@@ -16,11 +15,10 @@ class AsyncioSyntaxTest(unittest.TestCase):
 
         @asyncio.coroutine
         def go():
-            f = submit("1 + 1")
-            f = to_asyncio_future(f)
+            f = aiosubmit("1 + 1")
             resp = yield from f
             while True:
-                msg = to_asyncio_future(resp.read())
+                msg = resp.read()
                 msg = yield from msg
                 if msg is None:
                     break

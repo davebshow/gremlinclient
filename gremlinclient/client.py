@@ -31,7 +31,7 @@ class GremlinClient:
     """
     def __init__(self, url='ws://localhost:8182/', loop=None,
                  lang="gremlin-groovy", processor="", timeout=None,
-                 username="", password="", save_errors=False):
+                 username="", password=""):
         self._lang = lang
         self._processor = processor
         self._closed = False
@@ -40,7 +40,6 @@ class GremlinClient:
         self._timeout = timeout
         self._username = username
         self._password = password
-        self._save_errors = save_errors
 
     @property
     def processor(self):
@@ -118,7 +117,7 @@ class GremlinClient:
         def send_message(f):
             conn = f.result()
             conn.write_message(message)
-            future.set_result(GremlinResponse(conn, save_errors=self._save_errors))
+            future.set_result(GremlinResponse(conn))
 
         future_conn.add_done_callback(send_message)
 
@@ -128,10 +127,9 @@ class GremlinClient:
 class GremlinResponse:
 
     def __init__(self, conn, session=None, loop=None, username="",
-                 password="", save_errors=False):
+                 password=""):
         self._conn = conn
         self._closed = False
-        self._save_errors = save_errors
 
     def read(self):
         future = Future()
@@ -154,13 +152,10 @@ class GremlinResponse:
                 elif message.status_code == 204:
                     future.set_result(message)
                     self._closed = True
-                elif self._save_errors:
-                    future.set_result(message)
-                    self._closed = True
                 else:
+                    future.set_exception(RuntimeError(
+                        "{0} {1}".format(message.status_code, message.message)))
                     future.cancel()
-                    raise RuntimeError(
-                        "{0} {1}".format(message.status_code, message.message))
 
             future_resp.add_done_callback(parser)
         return future
@@ -177,10 +172,9 @@ def submit(gremlin,
            session=None,
            loop=None,
            username="",
-           password="",
-           save_errors=False):
+           password=""):
 
-    gc = GremlinClient(url=url, username=username, password=password, save_errors=save_errors)
+    gc = GremlinClient(url=url, username=username, password=password)
     try:
         future_resp = gc.submit(gremlin, bindings=bindings, lang=lang,
                                 rebindings=rebindings, op=op,

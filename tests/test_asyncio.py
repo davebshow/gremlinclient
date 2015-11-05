@@ -11,6 +11,9 @@ class AsyncioSyntaxTest(unittest.TestCase):
         AsyncIOMainLoop().install()
         self.loop = asyncio.get_event_loop()
 
+    def tearDown(self):
+        self.loop.close()
+
     def test_submit(self):
 
         @asyncio.coroutine

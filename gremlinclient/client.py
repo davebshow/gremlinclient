@@ -143,8 +143,8 @@ class GremlinResponse(object):
                 message = json.loads(f.result())
                 message = Message(message["status"]["code"],
                                   message["result"]["data"],
-                                  message["result"]["meta"],
-                                  message["status"]["message"])
+                                  message["status"]["message"],
+                                  message["result"]["meta"])
                 if message.status_code == 200:
                     future.set_result(message)
                     self._closed = True
@@ -154,9 +154,9 @@ class GremlinResponse(object):
                     future.set_result(message)
                     self._closed = True
                 else:
-                    future.cancel()
-                    raise RuntimeError(
-                        "{0} {1}".format(message.status_code, message.message))
+                    future.set_exception(RuntimeError(
+                        "{0} {1}".format(message.status_code, message.message)))
+                    self._closed = True
 
             future_resp.add_done_callback(parser)
         return future

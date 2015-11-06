@@ -155,7 +155,7 @@ class GremlinResponse:
                 else:
                     future.set_exception(RuntimeError(
                         "{0} {1}".format(message.status_code, message.message)))
-                    future.cancel()
+                    self._closed = True
 
             future_resp.add_done_callback(parser)
         return future

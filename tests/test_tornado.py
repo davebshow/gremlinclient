@@ -14,19 +14,25 @@ class Py27SyntaxTest(tornado.testing.AsyncTestCase):
     @gen_test
     def test_submit(self):
 
-        f = submit("1 + 1")
-        res = yield f
-        msg = yield res.read()
-        self.assertEqual(msg.status_code, 200)
-        self.assertEqual(msg.data[0], 2)
+        fut = submit("1 + 1")
+        res = yield fut
+        while True:
+            msg = yield res.read()
+            if msg is None:
+                break
+            self.assertEqual(msg.status_code, 200)
+            self.assertEqual(msg.data[0], 2)
 
     @gen_test(timeout=1)
     def test_exception(self):
 
         with self.assertRaises(RuntimeError):
-            func = submit("throw new Exception('error')")
-            res = yield func
-            yield res.read()
+            fut = submit("throw new Exception('error')")
+            res = yield fut
+            while True:
+                msg = yield res.read()
+                if msg is None:
+                    break
 
 
 

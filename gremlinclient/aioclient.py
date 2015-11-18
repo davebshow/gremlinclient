@@ -14,12 +14,11 @@ class AioGremlinClient(GremlinClient):
         self._response = AioGremlinResponse
 
     def submit(self, gremlin, bindings=None, lang=None, rebindings=None,
-               op="eval", processor=None, binary=True, session=None,
+               op="eval", processor=None, session=None,
                timeout=None):
         f = super(AioGremlinClient, self).submit(
             gremlin, bindings=bindings, lang=lang, rebindings=rebindings,
-            op=op, processor=processor, binary=binary, session=session,
-            timeout=timeout)
+            op=op, processor=processor, session=session, timeout=timeout)
         return to_asyncio_future(f)
 
 

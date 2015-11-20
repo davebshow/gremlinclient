@@ -173,6 +173,7 @@ class GremlinResponse(object):
                                   message["result"]["meta"])
                 if message.status_code == 200:
                     future.set_result(message)
+                    self._conn.close(code=1000)
                     self._closed = True
                 elif message.status_code == 206:
                     future.set_result(message)
@@ -181,10 +182,12 @@ class GremlinResponse(object):
                     pass
                 elif message.status_code == 204:
                     future.set_result(message)
+                    self._conn.close(code=1000)
                     self._closed = True
                 else:
                     future.set_exception(RuntimeError(
                         "{0} {1}".format(message.status_code, message.message)))
+                    self._conn.close(code=1006)
                     self._closed = True
 
             future_resp.add_done_callback(parser)

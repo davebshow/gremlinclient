@@ -11,6 +11,9 @@ class PEP492SyntaxTest(unittest.TestCase):
         AsyncIOMainLoop().install()
         self.loop = asyncio.get_event_loop()
 
+    def tearDown(self):
+        AsyncIOMainLoop().clear_instance()
+
     def test_submit(self):
 
         async def go():

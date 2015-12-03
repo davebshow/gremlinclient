@@ -12,7 +12,7 @@ setup(
     long_description=open("README.txt").read(),
     packages=["gremlinclient", "tests"],
     install_requires=[
-        "tornado==4.2.1"
+        "tornado==4.3"
     ],
     test_suite="tests",
     classifiers=[

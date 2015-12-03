@@ -72,7 +72,7 @@ class GremlinClient(object):
 
     def submit(self, gremlin, bindings=None, lang=None, rebindings=None,
                op="eval", processor=None, session=None,
-               timeout=None, mime_type="application/json"):
+               timeout=None, mime_type="application/json", handler=None):
         """
         :ref:`coroutine<coroutine>` method.
         Submit a script to the Gremlin Server.
@@ -112,7 +112,7 @@ class GremlinClient(object):
         def send_message(f):
             conn = f.result()
             conn.write_message(message, binary=True)
-            future.set_result(self._response(conn))
+            future.set_result(self._response(conn, handler=handler))
 
         future_conn.add_done_callback(send_message)
 
@@ -152,11 +152,15 @@ class GremlinClient(object):
 class GremlinResponse(object):
 
     def __init__(self, conn, session=None, loop=None, username="",
-                 password=""):
+                 password="", handler=None):
         self._conn = conn
         self._closed = False
         self._username = username
         self._password = password
+        self._handler = handler
+
+    def add_handler(self, func):
+        self._handler = func
 
     def read(self):
         future = Future()
@@ -171,17 +175,19 @@ class GremlinResponse(object):
                                   message["result"]["data"],
                                   message["status"]["message"],
                                   message["result"]["meta"])
+                if self._handler is None:
+                    self._handler = lambda x: x
                 if message.status_code == 200:
-                    future.set_result(message)
+                    future.set_result(self._handler(message))
                     self._conn.close(code=1000)
                     self._closed = True
                 elif message.status_code == 206:
-                    future.set_result(message)
+                    future.set_result(self._handler(message))
                 elif message.status_code == 407:
                     # Set up auth/ssl here
                     pass
                 elif message.status_code == 204:
-                    future.set_result(message)
+                    future.set_result(self._handler(message))
                     self._conn.close(code=1000)
                     self._closed = True
                 else:
@@ -223,14 +229,15 @@ def submit(gremlin,
            session=None,
            loop=None,
            username="",
-           password=""):
+           password="",
+           handler=None):
 
     gc = GremlinClient(url=url, username=username, password=password)
     try:
         future_resp = gc.submit(gremlin, bindings=bindings, lang=lang,
                                 rebindings=rebindings, op=op,
                                 processor=processor, session=session,
-                                timeout=timeout)
+                                timeout=timeout, handler=handler)
         return future_resp
     finally:
         gc.close()

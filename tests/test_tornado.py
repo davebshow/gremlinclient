@@ -38,7 +38,7 @@ class Py27SyntaxTest(tornado.testing.AsyncTestCase):
 
     # These should be gen_test
     def test_add_handler(self):
-        """Will be doing things like this in mogwai"""
+
         class Dummy(object):
             def __init__(self):
                 self.results = None
@@ -48,8 +48,8 @@ class Py27SyntaxTest(tornado.testing.AsyncTestCase):
                 future_results = submit("1 + 1")
 
                 def process_results(results):
-                     self.results = results.data
-                     return results
+                    self.results = results.data
+                    return results
 
                 def set_processor(f):
                     result = f.result()
@@ -74,15 +74,17 @@ class Py27SyntaxTest(tornado.testing.AsyncTestCase):
 
 
     def test_pass_handler(self):
-        """Will be doing things like this in mogwai"""
+
         class Dummy(object):
             def __init__(self):
                 self.results = None
 
-            def req(self):
+            def req(self, cond):
+
                 def process_results(results):
-                     self.results = results.data
-                     return results
+                    if not cond:
+                        self.results = results.data
+                    return results
 
                 future_results = submit("1 + 1", handler=process_results)
 
@@ -91,7 +93,7 @@ class Py27SyntaxTest(tornado.testing.AsyncTestCase):
         @gen.coroutine
         def go():
             dummy = Dummy()
-            resp = yield dummy.req()
+            resp = yield dummy.req(False)
             while True:
                 msg = yield resp.read()
                 if msg is None:

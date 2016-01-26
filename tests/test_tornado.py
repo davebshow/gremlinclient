@@ -6,6 +6,8 @@ from tornado.websocket import WebSocketClientConnection
 from tornado.testing import gen_test, AsyncTestCase
 from tornado.ioloop import IOLoop
 from gremlinclient import GremlinFactory
+from gremlinclient import GremlinPool
+from gremlinclient import GremlinStream
 
 
 class Py27SyntaxTest(AsyncTestCase):
@@ -13,6 +15,7 @@ class Py27SyntaxTest(AsyncTestCase):
     def setUp(self):
         super(Py27SyntaxTest, self).setUp()
         self.factory = GremlinFactory()
+        self.pool = GremlinPool(factory=self.factory, maxsize=2)
 
     @gen_test
     def test_connect(self):
@@ -32,6 +35,54 @@ class Py27SyntaxTest(AsyncTestCase):
                 break
             self.assertEqual(msg.status_code, 200)
             self.assertEqual(msg.data[0], 2)
+
+    @gen_test
+    def test_acquire(self):
+        connection = yield self.pool.acquire()
+        conn = yield connection.conn
+        self.assertIsNotNone(conn.protocol)
+        self.assertIsInstance(conn, WebSocketClientConnection)
+        self.assertEqual(self.pool.size, 1)
+        self.assertTrue(connection in self.pool._acquired)
+        connection2 = yield self.pool.acquire()
+        conn2 = yield connection.conn
+        self.assertIsNotNone(conn2.protocol)
+        self.assertIsInstance(conn2, WebSocketClientConnection)
+        self.assertEqual(self.pool.size, 2)
+        self.assertTrue(connection2 in self.pool._acquired)
+        conn.close()
+        conn2.close()
+
+
+class Py27MogwaiDataFlowTest(AsyncTestCase):
+
+    def setUp(self):
+        super(Py27MogwaiDataFlowTest, self).setUp()
+        self.pool = GremlinPool()
+
+    @gen_test
+    def test_data_flow(self):
+
+        # Will have to chain callbacks
+        def execute():
+            future = Future()
+            future_conn = self.pool.acquire()
+
+            def cb(f):
+                conn = f.result()
+                future_submit = conn.submit("1 + 1")
+
+                def cb2(f):
+                    future.set_result(f.result())
+
+                future_submit.add_done_callback(cb2)
+
+            future_conn.add_done_callback(cb)
+
+            return future
+
+        result = yield execute()
+        self.assertIsInstance(result, GremlinStream)
 
     # def setUp(self):
     #     super(Py27SyntaxTest, self).setUp()

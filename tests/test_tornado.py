@@ -28,7 +28,7 @@ class Py27SyntaxTest(AsyncTestCase):
     @gen_test
     def test_submit(self):
         connection = yield self.factory.connect()
-        resp = yield connection.submit("1 + 1")
+        resp = connection.submit("1 + 1")
         while True:
             msg = yield resp.read()
             if msg is None:
@@ -71,12 +71,8 @@ class Py27MogwaiDataFlowTest(AsyncTestCase):
 
             def cb(f):
                 conn = f.result()
-                future_submit = conn.submit("1 + 1")
-
-                def cb2(f):
-                    future.set_result(f.result())
-
-                future_submit.add_done_callback(cb2)
+                stream = conn.submit("1 + 1")
+                future.set_result(stream)
 
             future_conn.add_done_callback(cb)
 

@@ -110,11 +110,8 @@ class GremlinConnection(AbstractBaseConnection):
         future = Future()
 
         self.conn.write_message(message, binary=True)
-        
-        future.set_result(GremlinStream(self.conn, handler=handler))
 
-
-        return future
+        return GremlinStream(self.conn, handler=handler)
 
     @staticmethod
     def _prepare_message(gremlin, bindings, lang, rebindings, op, processor,

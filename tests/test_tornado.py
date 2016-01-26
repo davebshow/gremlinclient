@@ -19,15 +19,15 @@ class Py27SyntaxTest(AsyncTestCase):
 
     @gen_test
     def test_connect(self):
-        connection = self.factory.connect()
-        conn = yield connection.conn
+        connection = yield self.factory.connect()
+        conn = connection.conn
         self.assertIsNotNone(conn.protocol)
         self.assertIsInstance(conn, WebSocketClientConnection)
         conn.close()
 
     @gen_test
     def test_submit(self):
-        connection = self.factory.connect()
+        connection = yield self.factory.connect()
         resp = yield connection.submit("1 + 1")
         while True:
             msg = yield resp.read()
@@ -35,25 +35,25 @@ class Py27SyntaxTest(AsyncTestCase):
                 break
             self.assertEqual(msg.status_code, 200)
             self.assertEqual(msg.data[0], 2)
-
-    @gen_test
-    def test_acquire(self):
-        connection = yield self.pool.acquire()
-        conn = yield connection.conn
-        self.assertIsNotNone(conn.protocol)
-        self.assertIsInstance(conn, WebSocketClientConnection)
-        self.assertEqual(self.pool.size, 1)
-        self.assertTrue(connection in self.pool._acquired)
-        connection2 = yield self.pool.acquire()
-        conn2 = yield connection.conn
-        self.assertIsNotNone(conn2.protocol)
-        self.assertIsInstance(conn2, WebSocketClientConnection)
-        self.assertEqual(self.pool.size, 2)
-        self.assertTrue(connection2 in self.pool._acquired)
-        conn.close()
-        conn2.close()
-
-
+#
+#     @gen_test
+#     def test_acquire(self):
+#         connection = yield self.pool.acquire()
+#         conn = yield connection.conn
+#         self.assertIsNotNone(conn.protocol)
+#         self.assertIsInstance(conn, WebSocketClientConnection)
+#         self.assertEqual(self.pool.size, 1)
+#         self.assertTrue(connection in self.pool._acquired)
+#         connection2 = yield self.pool.acquire()
+#         conn2 = yield connection.conn
+#         self.assertIsNotNone(conn2.protocol)
+#         self.assertIsInstance(conn2, WebSocketClientConnection)
+#         self.assertEqual(self.pool.size, 2)
+#         self.assertTrue(connection2 in self.pool._acquired)
+#         conn.close()
+#         conn2.close()
+#
+#
 class Py27MogwaiDataFlowTest(AsyncTestCase):
 
     def setUp(self):
@@ -66,7 +66,8 @@ class Py27MogwaiDataFlowTest(AsyncTestCase):
         # Will have to chain callbacks
         def execute():
             future = Future()
-            future_conn = self.pool.acquire()
+            factory = GremlinFactory()
+            future_conn = factory.connect()
 
             def cb(f):
                 conn = f.result()
@@ -83,6 +84,8 @@ class Py27MogwaiDataFlowTest(AsyncTestCase):
 
         result = yield execute()
         self.assertIsInstance(result, GremlinStream)
+        resp = yield result.read()
+        self.assertEqual(resp.data[0], 2)
 
     # def setUp(self):
     #     super(Py27SyntaxTest, self).setUp()

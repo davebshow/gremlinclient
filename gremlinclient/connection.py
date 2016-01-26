@@ -37,6 +37,7 @@ class GremlinConnection(AbstractBaseConnection):
         self._timeout = timeout
         self._username = username
         self._password = password
+        self._open = bool(conn.protocol)
 
     @property
     def conn(self):
@@ -108,12 +109,10 @@ class GremlinConnection(AbstractBaseConnection):
 
         future = Future()
 
-        def send_message(f):
-            conn = f.result()
-            conn.write_message(message, binary=True)
-            future.set_result(GremlinStream(conn, handler=handler))
+        self.conn.write_message(message, binary=True)
+        
+        future.set_result(GremlinStream(self.conn, handler=handler))
 
-        self.conn.add_done_callback(send_message)
 
         return future
 
@@ -166,6 +165,7 @@ class GremlinStream(object):
         if self._closed:
             future.set_result(None)
         else:
+
             future_resp = self._conn.read_message()
 
             def parser(f):
@@ -178,8 +178,9 @@ class GremlinStream(object):
                     self._handler = lambda x: x
                 if message.status_code == 200:
                     future.set_result(self._handler(message))
-                    self._conn.close(code=1000)
+                    # self._conn.close(code=1000)
                     self._closed = True
+                    self._conn = None
                 elif message.status_code == 206:
                     future.set_result(self._handler(message))
                 elif message.status_code == 407:
@@ -187,13 +188,15 @@ class GremlinStream(object):
                     pass
                 elif message.status_code == 204:
                     future.set_result(self._handler(message))
-                    self._conn.close(code=1000)
+                    # self._conn.close(code=1000)
                     self._closed = True
+                    self._conn = None
                 else:
                     future.set_exception(RuntimeError(
                         "{0} {1}".format(message.status_code, message.message)))
-                    self._conn.close(code=1006)
+                    # self._conn.close(code=1006)
                     self._closed = True
+                    self._conn = None
 
             future_resp.add_done_callback(parser)
         return future

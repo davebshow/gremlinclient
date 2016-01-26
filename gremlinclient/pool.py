@@ -64,7 +64,6 @@ class GremlinPool(object):
             elif self._waiters:
                 waiter = self._waiters.popleft()
                 waiter.set_result(conn)
-                self._aquired.add(conn)
             else:
                 self._pool.append(conn)
                 self._acquired.remove(conn)

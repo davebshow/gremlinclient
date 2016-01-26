@@ -5,14 +5,18 @@ from tornado.concurrent import Future
 from tornado.websocket import WebSocketClientConnection
 from tornado.testing import gen_test, AsyncTestCase
 from tornado.ioloop import IOLoop
-from gremlinclient import factory
+from gremlinclient import GremlinFactory
 
 
 class Py27SyntaxTest(AsyncTestCase):
 
+    def setUp(self):
+        super(Py27SyntaxTest, self).setUp()
+        self.factory = GremlinFactory()
+
     @gen_test
     def test_connect(self):
-        connection = factory.GremlinFactory.connect()
+        connection = self.factory.connect()
         conn = yield connection.conn
         self.assertIsNotNone(conn.protocol)
         self.assertIsInstance(conn, WebSocketClientConnection)
@@ -20,7 +24,7 @@ class Py27SyntaxTest(AsyncTestCase):
 
     @gen_test
     def test_submit(self):
-        connection = factory.GremlinFactory.connect()
+        connection = self.factory.connect()
         resp = yield connection.submit("1 + 1")
         while True:
             msg = yield resp.read()

@@ -5,7 +5,6 @@ from six import add_metaclass
 @add_metaclass(ABCMeta)
 class AbstractBaseFactory(object):
 
-    @classmethod
     @abstractmethod
     def connect(cls):
         pass
@@ -31,5 +30,5 @@ class AbstractBaseConnection(object):
         pass
 
     @abstractproperty
-    def close(self):
+    def closed(self):
         pass

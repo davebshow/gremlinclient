@@ -9,11 +9,12 @@ class TornadoPEP492SyntaxFactoryTest(unittest.TestCase):
 
     def setUp(self):
         self.loop = IOLoop.current()
+        self.factory = GremlinFactory()
 
     def test_connect(self):
 
         async def go():
-            connection = GremlinFactory.connect()
+            connection = self.factory.connect()
             conn = await connection.conn
             self.assertIsNotNone(conn.protocol)
             self.assertIsInstance(conn, WebSocketClientConnection)
@@ -24,7 +25,7 @@ class TornadoPEP492SyntaxFactoryTest(unittest.TestCase):
     def test_submit(self):
 
         async def go():
-            connection = GremlinFactory.connect()
+            connection = self.factory.connect()
             resp = await connection.submit("1 + 1")
             while True:
                 msg = await resp.read()

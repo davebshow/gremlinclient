@@ -37,7 +37,6 @@ class GremlinConnection(AbstractBaseConnection):
         self._timeout = timeout
         self._username = username
         self._password = password
-        self._open = bool(conn.protocol)
 
     @property
     def conn(self):
@@ -59,17 +58,14 @@ class GremlinConnection(AbstractBaseConnection):
         """Getter/setter for database url used by the client"""
         return self._url
 
-    @url.setter
-    def url(self, value):
-        self._url = value
-
     @property
     def closed(self):
         """Readonly property. Return True if client has been closed"""
-        pass
+        return self._closed or self._conn.protocol is None
 
     def close(self):
-        pass
+        self._conn.close()
+        self._closed = True
 
     def submit(self, gremlin, bindings=None, lang=None, rebindings=None,
                op="eval", processor=None, session=None,
@@ -106,8 +102,6 @@ class GremlinConnection(AbstractBaseConnection):
             gremlin, bindings=bindings, lang=lang, rebindings=rebindings,
             op=op, processor=processor, session=session)
         message = self._set_message_header(message, mime_type)
-
-        future = Future()
 
         self.conn.write_message(message, binary=True)
 

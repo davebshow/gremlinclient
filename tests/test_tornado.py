@@ -1,3 +1,4 @@
+from datetime import timedelta
 import unittest
 import tornado
 from tornado import gen
@@ -10,12 +11,11 @@ from gremlinclient import GremlinPool
 from gremlinclient import GremlinStream
 
 
-class Py27SyntaxTest(AsyncTestCase):
+class TornadoFactoryConnectTest(AsyncTestCase):
 
     def setUp(self):
-        super(Py27SyntaxTest, self).setUp()
+        super(TornadoFactoryConnectTest, self).setUp()
         self.factory = GremlinFactory()
-        self.pool = GremlinPool(factory=self.factory, maxsize=2)
 
     @gen_test
     def test_connect(self):
@@ -35,50 +35,135 @@ class Py27SyntaxTest(AsyncTestCase):
                 break
             self.assertEqual(msg.status_code, 200)
             self.assertEqual(msg.data[0], 2)
-#
-#     @gen_test
-#     def test_acquire(self):
-#         connection = yield self.pool.acquire()
-#         conn = yield connection.conn
-#         self.assertIsNotNone(conn.protocol)
-#         self.assertIsInstance(conn, WebSocketClientConnection)
-#         self.assertEqual(self.pool.size, 1)
-#         self.assertTrue(connection in self.pool._acquired)
-#         connection2 = yield self.pool.acquire()
-#         conn2 = yield connection.conn
-#         self.assertIsNotNone(conn2.protocol)
-#         self.assertIsInstance(conn2, WebSocketClientConnection)
-#         self.assertEqual(self.pool.size, 2)
-#         self.assertTrue(connection2 in self.pool._acquired)
-#         conn.close()
-#         conn2.close()
-#
-#
-class Py27MogwaiDataFlowTest(AsyncTestCase):
+        connection.conn.close()
+
+class TornadoPoolTest(AsyncTestCase):
+
+    @gen_test
+    def test_acquire(self):
+        pool = GremlinPool(maxsize=2)
+        connection = yield pool.acquire()
+        conn = connection.conn
+        self.assertIsNotNone(conn.protocol)
+        self.assertIsInstance(conn, WebSocketClientConnection)
+        self.assertEqual(pool.size, 1)
+        self.assertTrue(connection in pool._acquired)
+        connection2 = yield pool.acquire()
+        conn2 = connection.conn
+        self.assertIsNotNone(conn2.protocol)
+        self.assertIsInstance(conn2, WebSocketClientConnection)
+        self.assertEqual(pool.size, 2)
+        self.assertTrue(connection2 in pool._acquired)
+        conn.close()
+        conn2.close()
+
+    @gen_test
+    def test_acquire_submit(self):
+        pool = GremlinPool(maxsize=2)
+        connection = yield pool.acquire()
+        resp = connection.submit("1 + 1")
+        while True:
+            msg = yield resp.read()
+            if msg is None:
+                break
+            self.assertEqual(msg.status_code, 200)
+            self.assertEqual(msg.data[0], 2)
+        connection.conn.close()
+
+    @gen_test
+    def test_maxsize(self):
+        pool = GremlinPool(maxsize=2)
+        c1 = yield pool.acquire()
+        c2 = yield pool.acquire()
+        c3 = pool.acquire()
+        self.assertIsInstance(c3, Future)
+        try:
+            yield gen.with_timeout(timedelta(seconds=0.1), c3)
+            error = False
+        except tornado.gen.TimeoutError:
+            error = True
+        self.assertTrue(error)
+        c1.conn.close()
+        c2.conn.close()
+
+    @gen_test
+    def test_release(self):
+        pool = GremlinPool(maxsize=2)
+        self.assertEqual(len(pool.pool), 0)
+        c1 = yield pool.acquire()
+        self.assertEqual(len(pool._acquired), 1)
+        pool.release(c1)
+        self.assertEqual(len(pool.pool), 1)
+        self.assertEqual(len(pool._acquired), 0)
+
+    @gen_test
+    def test_maxsize_release(self):
+        pool = GremlinPool(maxsize=2)
+        c1 = yield pool.acquire()
+        c2 = yield pool.acquire()
+        c3 = pool.acquire()
+        self.assertIsInstance(c3, Future)
+        try:
+            yield gen.with_timeout(timedelta(seconds=0.1), c3)
+            error = False
+        except tornado.gen.TimeoutError:
+            error = True
+        self.assertTrue(error)
+        pool.release(c2)
+        c3 = yield c3
+        self.assertEqual(c2, c3)
+        c1.conn.close()
+        c2.conn.close()
+        c3.conn.close()
+
+    @gen_test
+    def test_close(self):
+        pool = GremlinPool(maxsize=2)
+        c1 = yield pool.acquire()
+        c2 = yield pool.acquire()
+        pool.release(c2)
+        pool.close()
+        self.assertIsNone(c2.conn.protocol)
+        self.assertIsNotNone(c1.conn.protocol)
+        c1.close()
+
+    @gen_test
+    def test_cancelled(self):
+        pool = GremlinPool(maxsize=2)
+        c1 = yield pool.acquire()
+        c2 = yield pool.acquire()
+        c3 = pool.acquire()
+        pool.close()
+        # Tornado futures do not support cancellation!
+        # self.assertTrue(c3.cancelled())
+        c1.close()
+        c2.close()
+
+
+class TornadoCallbackStyleTest(AsyncTestCase):
 
     def setUp(self):
-        super(Py27MogwaiDataFlowTest, self).setUp()
+        super(TornadoCallbackStyleTest, self).setUp()
         self.pool = GremlinPool()
 
     @gen_test
     def test_data_flow(self):
 
-        # Will have to chain callbacks
-        def execute():
+        def execute(script):
             future = Future()
             factory = GremlinFactory()
             future_conn = factory.connect()
 
             def cb(f):
                 conn = f.result()
-                stream = conn.submit("1 + 1")
+                stream = conn.submit(script)
                 future.set_result(stream)
 
             future_conn.add_done_callback(cb)
 
             return future
 
-        result = yield execute()
+        result = yield execute("1 + 1")
         self.assertIsInstance(result, GremlinStream)
         resp = yield result.read()
         self.assertEqual(resp.data[0], 2)

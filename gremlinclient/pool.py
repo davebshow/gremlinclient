@@ -1,4 +1,3 @@
-import asyncio
 import collections
 
 from tornado.concurrent import Future
@@ -39,26 +38,33 @@ class GremlinPool(object):
     def factory(self):
         return self._factory
 
+    @property
+    def pool(self):
+        return self._pool
+
     def acquire(self):
         # maybe have max connection open time here
-        f = Future()
+        future = Future()
         if self._pool:
             conn = self._pool.popleft()
-            f.set_result(conn)
+            future.set_result(conn)
             self.acquired.add(conn)
         elif self.size < self.maxsize:
             self._acquiring += 1
-            conn = self.factory.connect()
-            self._acquiring -= 1
-            self._acquired.add(conn)
-            f.set_result(conn)
+            conn_future = self.factory.connect()
+            def cb(f):
+                conn = f.result()
+                self._acquiring -= 1
+                self._acquired.add(conn)
+                future.set_result(conn)
+            conn_future.add_done_callback(cb)
         else:
-            self._waiters.append(f)
-        return f
+            self._waiters.append(future)
+        return future
 
     def release(self, conn):
-        if self.size < self.maxsize:
-            if conn.protocol is None:
+        if self.size <= self.maxsize:
+            if conn.closed:
                 # conn has been closed
                 self._acquired.remove(conn)
             elif self._waiters:
@@ -68,5 +74,13 @@ class GremlinPool(object):
                 self._pool.append(conn)
                 self._acquired.remove(conn)
         else:
-            conn.close(code=1000)
+            conn.close()
             self._acquired.remove(conn)
+
+    def close(self):
+        while self.pool:
+            conn = self.pool.popleft()
+            conn.close()
+        while self._waiters:
+            f = self._waiters.popleft()
+            f.cancel()

@@ -1,10 +1,11 @@
 # These context managers can be used for yielding active connections
 # will have to do checks in yield definition, e.g. if PYTHON_34 etc.
+# This is inspired by:
+# https://github.com/aio-libs/aioredis/blob/master/aioredis/pool.py
 
 
 class _PoolConnectionContextManager(object):
-    """Borrowed from
-    https://github.com/aio-libs/aioredis/blob/master/aioredis/pool.py"""
+
     __slots__ = ('_pool', '_conn')
 
     def __init__(self, pool, conn):
@@ -23,8 +24,6 @@ class _PoolConnectionContextManager(object):
 
 
 class _FactoryConnectionContextManager(object):
-    """Borrowed from
-    https://github.com/aio-libs/aioredis/blob/master/aioredis/pool.py"""
     __slots__ = ('_conn')
 
     def __init__(self, conn):

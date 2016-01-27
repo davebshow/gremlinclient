@@ -3,6 +3,7 @@ from tornado.websocket import websocket_connect
 
 from gremlinclient.base import AbstractBaseFactory
 from gremlinclient.connection import GremlinConnection
+from gremlinclient.manager import _FactoryConnectionContextManager
 
 
 class GremlinFactory(AbstractBaseFactory):
@@ -36,3 +37,7 @@ class GremlinFactory(AbstractBaseFactory):
         future_conn.add_done_callback(get_conn)
 
         return future
+
+    def connection(self):
+        conn = self.connect()
+        return _FactoryConnectionContextManager(conn)

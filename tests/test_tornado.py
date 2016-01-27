@@ -140,6 +140,25 @@ class TornadoPoolTest(AsyncTestCase):
         c2.close()
 
 
+class TornadoCtxtMngrTest(AsyncTestCase):
+
+    @gen_test
+    def test_pool_manager(self):
+        pool = GremlinPool(maxsize=2)
+        with pool.connection() as conn:
+            conn = yield conn
+            self.assertFalse(conn.closed)
+        self.assertEqual(len(pool.pool), 1)
+        self.assertEqual(len(pool._acquired), 0)
+
+    @gen_test
+    def test_factory_manager(self):
+        factory = GremlinFactory()
+        with factory.connection() as conn:
+            conn = yield conn
+            self.assertFalse(conn.closed)
+
+
 class TornadoCallbackStyleTest(AsyncTestCase):
 
     def setUp(self):

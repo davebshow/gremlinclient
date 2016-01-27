@@ -3,6 +3,7 @@ import collections
 from tornado.concurrent import Future
 
 from gremlinclient.factory import GremlinFactory
+from gremlinclient.manager import _PoolConnectionContextManager
 
 
 class GremlinPool(object):
@@ -15,12 +16,18 @@ class GremlinPool(object):
         self._waiters = collections.deque()
         self._acquired = set()
         self._acquiring = 0
+        self._closed = False
         # This may change depending on how other factories are passed
-        self._factory = factory
-        if self._factory is None:
-            self._factory = GremlinFactory(
-                url=url, lang=lang, processor=processor, timeout=timeout,
-                username=username, password=password)
+        self._factory = factory or GremlinFactory(url=url,
+                                                  lang=lang,
+                                                  processor=processor,
+                                                  timeout=timeout,
+                                                  username=username,
+                                                  password=password)
+
+    def connection(self):
+        conn = self.acquire()
+        return _PoolConnectionContextManager(self, conn)
 
     @property
     def freesize(self):
@@ -41,6 +48,10 @@ class GremlinPool(object):
     @property
     def pool(self):
         return self._pool
+
+    @property
+    def closed(self):
+        return self._closed or self._factory is None
 
     def acquire(self):
         # maybe have max connection open time here
@@ -84,3 +95,5 @@ class GremlinPool(object):
         while self._waiters:
             f = self._waiters.popleft()
             f.cancel()
+        self._factory = None
+        self._closed = True

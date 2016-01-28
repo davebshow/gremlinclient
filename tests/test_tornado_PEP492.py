@@ -3,13 +3,15 @@ from tornado import gen
 from tornado.websocket import WebSocketClientConnection
 from tornado.ioloop import IOLoop
 from gremlinclient import GremlinFactory
+from gremlinclient import GremlinPool
 
 
-class TornadoPEP492SyntaxFactoryTest(unittest.TestCase):
+class TornadoPEP492SyntaxTest(unittest.TestCase):
 
     def setUp(self):
         self.loop = IOLoop.current()
         self.factory = GremlinFactory()
+        self.pool = GremlinPool(factory=self.factory, maxsize=2)
 
     def test_connect(self):
 

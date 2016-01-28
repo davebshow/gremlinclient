@@ -14,18 +14,18 @@ class GremlinFactory(AbstractBaseFactory):
 
     def __init__(self, url='ws://localhost:8182/', lang="gremlin-groovy",
                  processor="", timeout=None, username="", password="",
-                 loop=None):
+                 loop=None, validate_cert=False):
         self._url = url
         self._lang = lang
         self._processor = processor
         self._timeout = timeout
         self._username = username
         self._password = password
-        if loop is None:
-            self._loop = IOLoop.current()
+        self._loop = loop or IOLoop.current()
+        self._validate_cert = validate_cert
 
     def connect(self, force_close=False):
-        request = HTTPRequest(self._url, validate_cert=False)
+        request = HTTPRequest(self._url, validate_cert=self._validate_cert)
         future = Future()
         future_conn = websocket_connect(request)
 

@@ -1,6 +1,7 @@
 import collections
 
 from tornado.concurrent import Future
+from tornado.ioloop import IOLoop
 
 from gremlinclient.factory import GremlinFactory
 from gremlinclient.manager import _PoolConnectionContextManager
@@ -10,13 +11,14 @@ class GremlinPool(object):
 
     def __init__(self, url='ws://localhost:8182/', lang="gremlin-groovy",
                  processor="", timeout=None, username="", password="",
-                 factory=None, maxsize=256):
+                 factory=None, maxsize=256, loop=None):
         self._maxsize = maxsize
         self._pool = collections.deque()
         self._waiters = collections.deque()
         self._acquired = set()
         self._acquiring = 0
         self._closed = False
+        self._loop = loop or IOLoop.current()
         # This may change depending on how other factories are passed
         self._factory = factory or GremlinFactory(url=url,
                                                   lang=lang,
@@ -68,7 +70,7 @@ class GremlinPool(object):
                 self._acquiring -= 1
                 self._acquired.add(conn)
                 future.set_result(conn)
-            conn_future.add_done_callback(cb)
+            self._loop.add_future(conn_future, cb)
         else:
             self._waiters.append(future)
         return future

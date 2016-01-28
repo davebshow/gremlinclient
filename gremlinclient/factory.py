@@ -1,5 +1,7 @@
 import socket
 from tornado.concurrent import Future
+from tornado.httpclient import HTTPRequest
+from tornado.ioloop import IOLoop
 from tornado.websocket import websocket_connect
 
 from gremlinclient.base import AbstractBaseFactory
@@ -11,18 +13,21 @@ class GremlinFactory(AbstractBaseFactory):
     """This class generates connections to the Gremlin Server"""
 
     def __init__(self, url='ws://localhost:8182/', lang="gremlin-groovy",
-                 processor="", timeout=None, username="", password=""):
+                 processor="", timeout=None, username="", password="",
+                 loop=None):
         self._url = url
         self._lang = lang
         self._processor = processor
         self._timeout = timeout
         self._username = username
         self._password = password
+        if loop is None:
+            self._loop = IOLoop.current()
 
     def connect(self, force_close=False):
-
+        request = HTTPRequest(self._url, validate_cert=False)
         future = Future()
-        future_conn = websocket_connect(self._url)
+        future_conn = websocket_connect(request)
 
         def get_conn(f):
             try:
@@ -35,8 +40,7 @@ class GremlinFactory(AbstractBaseFactory):
                                        self._password, force_close=force_close)
                 future.set_result(gc)
 
-        future_conn.add_done_callback(get_conn)
-
+        self._loop.add_future(future_conn, get_conn)
         return future
 
     def connection(self):

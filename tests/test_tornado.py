@@ -16,7 +16,9 @@ class TornadoFactoryConnectTest(AsyncTestCase):
 
     def setUp(self):
         super(TornadoFactoryConnectTest, self).setUp()
-        self.factory = GremlinFactory()
+        self.factory = GremlinFactory("wss://localhost:8182/",
+                                      username="stephen",
+                                      password="password")
 
     @gen_test
     def test_connect(self):
@@ -65,7 +67,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_acquire(self):
-        pool = GremlinPool(maxsize=2)
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password")
         connection = yield pool.acquire()
         conn = connection.conn
         self.assertIsNotNone(conn.protocol)
@@ -83,7 +88,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_acquire_submit(self):
-        pool = GremlinPool(maxsize=2)
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password")
         connection = yield pool.acquire()
         resp = connection.submit("1 + 1")
         while True:
@@ -96,7 +104,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_maxsize(self):
-        pool = GremlinPool(maxsize=2)
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password")
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         c3 = pool.acquire()
@@ -112,7 +123,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_release(self):
-        pool = GremlinPool(maxsize=2)
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password")
         self.assertEqual(len(pool.pool), 0)
         c1 = yield pool.acquire()
         self.assertEqual(len(pool._acquired), 1)
@@ -122,7 +136,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_maxsize_release(self):
-        pool = GremlinPool(maxsize=2)
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password")
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         c3 = pool.acquire()
@@ -142,7 +159,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_close(self):
-        pool = GremlinPool(maxsize=2)
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password")
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         pool.release(c2)
@@ -153,7 +173,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_cancelled(self):
-        pool = GremlinPool(maxsize=2)
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password")
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         c3 = pool.acquire()
@@ -168,7 +191,10 @@ class TornadoCtxtMngrTest(AsyncTestCase):
 
     @gen_test
     def test_pool_manager(self):
-        pool = GremlinPool(maxsize=2)
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password")
         with pool.connection() as conn:
             conn = yield conn
             self.assertFalse(conn.closed)
@@ -178,7 +204,9 @@ class TornadoCtxtMngrTest(AsyncTestCase):
 
     @gen_test
     def test_factory_manager(self):
-        factory = GremlinFactory()
+        factory = GremlinFactory(url="wss://localhost:8182/",
+                                 username="stephen",
+                                 password="password")
         with factory.connection() as conn:
             conn = yield conn
             self.assertFalse(conn.closed)
@@ -219,7 +247,9 @@ class TornadoCallbackStyleTest(AsyncTestCase):
 
         def execute(script):
             future = Future()
-            factory = GremlinFactory()
+            factory = GremlinFactory(url="wss://localhost:8182/",
+                                     username="stephen",
+                                     password="password")
             future_conn = factory.connect()
 
             def cb(f):
@@ -236,98 +266,98 @@ class TornadoCallbackStyleTest(AsyncTestCase):
         resp = yield result.read()
         self.assertEqual(resp.data[0], 2)
 
-    # def setUp(self):
-    #     super(Py27SyntaxTest, self).setUp()
-    #     self.loop = IOLoop.current()
-    #
-    # @gen_test
-    # def test_submit(self):
-    #
-    #     fut = submit("1 + 1")
-    #     res = yield fut
-    #     while True:
-    #         msg = yield res.read()
-    #         if msg is None:
-    #             break
-    #         self.assertEqual(msg.status_code, 200)
-    #         self.assertEqual(msg.data[0], 2)
-    #
-    # @gen_test(timeout=1)
-    # def test_exception(self):
-    #
-    #     with self.assertRaises(RuntimeError):
-    #         fut = submit("throw new Exception('error')")
-    #         res = yield fut
-    #         while True:
-    #             msg = yield res.read()
-    #             if msg is None:
-    #                 break
-    #
-    # # These should be gen_test
-    # def test_add_handler(self):
-    #
-    #     class Dummy(object):
-    #         def __init__(self):
-    #             self.results = None
-    #
-    #         def req(self):
-    #             future = Future()
-    #             future_results = submit("1 + 1")
-    #
-    #             def process_results(results):
-    #                 self.results = results.data
-    #                 return results
-    #
-    #             def set_processor(f):
-    #                 result = f.result()
-    #                 result.add_handler(process_results)
-    #                 future.set_result(result)
-    #
-    #             future_results.add_done_callback(set_processor)
-    #
-    #             return future
-    #
-    #     @gen.coroutine
-    #     def go():
-    #         dummy = Dummy()
-    #         resp = yield dummy.req()
-    #         while True:
-    #             msg = yield resp.read()
-    #             if msg is None:
-    #                 break
-    #             self.assertEqual(dummy.results, msg.data)
-    #
-    #     self.loop.run_sync(go)
-    #
-    #
-    # def test_pass_handler(self):
-    #
-    #     class Dummy(object):
-    #         def __init__(self):
-    #             self.results = None
-    #
-    #         def req(self, cond):
-    #
-    #             def process_results(results):
-    #                 if not cond:
-    #                     self.results = results.data
-    #                 return results
-    #
-    #             future_results = submit("1 + 1", handler=process_results)
-    #
-    #             return future_results
-    #
-    #     @gen.coroutine
-    #     def go():
-    #         dummy = Dummy()
-    #         resp = yield dummy.req(False)
-    #         while True:
-    #             msg = yield resp.read()
-    #             if msg is None:
-    #                 break
-    #             self.assertEqual(dummy.results, msg.data)
-    #
-    #     self.loop.run_sync(go)
+#     # def setUp(self):
+#     #     super(Py27SyntaxTest, self).setUp()
+#     #     self.loop = IOLoop.current()
+#     #
+#     # @gen_test
+#     # def test_submit(self):
+#     #
+#     #     fut = submit("1 + 1")
+#     #     res = yield fut
+#     #     while True:
+#     #         msg = yield res.read()
+#     #         if msg is None:
+#     #             break
+#     #         self.assertEqual(msg.status_code, 200)
+#     #         self.assertEqual(msg.data[0], 2)
+#     #
+#     # @gen_test(timeout=1)
+#     # def test_exception(self):
+#     #
+#     #     with self.assertRaises(RuntimeError):
+#     #         fut = submit("throw new Exception('error')")
+#     #         res = yield fut
+#     #         while True:
+#     #             msg = yield res.read()
+#     #             if msg is None:
+#     #                 break
+#     #
+#     # # These should be gen_test
+#     # def test_add_handler(self):
+#     #
+#     #     class Dummy(object):
+#     #         def __init__(self):
+#     #             self.results = None
+#     #
+#     #         def req(self):
+#     #             future = Future()
+#     #             future_results = submit("1 + 1")
+#     #
+#     #             def process_results(results):
+#     #                 self.results = results.data
+#     #                 return results
+#     #
+#     #             def set_processor(f):
+#     #                 result = f.result()
+#     #                 result.add_handler(process_results)
+#     #                 future.set_result(result)
+#     #
+#     #             future_results.add_done_callback(set_processor)
+#     #
+#     #             return future
+#     #
+#     #     @gen.coroutine
+#     #     def go():
+#     #         dummy = Dummy()
+#     #         resp = yield dummy.req()
+#     #         while True:
+#     #             msg = yield resp.read()
+#     #             if msg is None:
+#     #                 break
+#     #             self.assertEqual(dummy.results, msg.data)
+#     #
+#     #     self.loop.run_sync(go)
+#     #
+#     #
+#     # def test_pass_handler(self):
+#     #
+#     #     class Dummy(object):
+#     #         def __init__(self):
+#     #             self.results = None
+#     #
+#     #         def req(self, cond):
+#     #
+#     #             def process_results(results):
+#     #                 if not cond:
+#     #                     self.results = results.data
+#     #                 return results
+#     #
+#     #             future_results = submit("1 + 1", handler=process_results)
+#     #
+#     #             return future_results
+#     #
+#     #     @gen.coroutine
+#     #     def go():
+#     #         dummy = Dummy()
+#     #         resp = yield dummy.req(False)
+#     #         while True:
+#     #             msg = yield resp.read()
+#     #             if msg is None:
+#     #                 break
+#     #             self.assertEqual(dummy.results, msg.data)
+#     #
+#     #     self.loop.run_sync(go)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,10 @@
+import base64
 import collections
 import json
 import uuid
 
 from tornado.concurrent import Future
+from tornado.ioloop import IOLoop
 
 from gremlinclient.base import AbstractBaseConnection
 
@@ -28,7 +30,7 @@ class GremlinConnection(AbstractBaseConnection):
         Usually an instance of ``aiogremlin.connector.GremlinConnector``
     """
     def __init__(self, conn, lang, processor, timeout, username,
-                 password, force_close=False):
+                 password, force_close=False, loop=None):
         self._conn = conn
         self._lang = lang
         self._processor = processor
@@ -38,6 +40,7 @@ class GremlinConnection(AbstractBaseConnection):
         self._username = username
         self._password = password
         self._force_close = force_close
+        self._loop = loop or IOLoop.current()
 
     @property
     def conn(self):
@@ -68,7 +71,7 @@ class GremlinConnection(AbstractBaseConnection):
         self._conn.close()
         self._closed = True
 
-    def submit(self, gremlin, bindings=None, lang=None, rebindings=None,
+    def submit(self, gremlin="", bindings=None, lang=None, rebindings=None,
                op="eval", processor=None, session=None,
                timeout=None, mime_type="application/json", handler=None):
         """
@@ -101,18 +104,21 @@ class GremlinConnection(AbstractBaseConnection):
         message = self._prepare_message(
             gremlin, bindings=bindings, lang=lang, rebindings=rebindings,
             op=op, processor=processor, session=session)
-        message = self._set_message_header(message, mime_type)
 
+        message = json.dumps(message)
+        message = self._set_message_header(message, mime_type)
         self.conn.write_message(message, binary=True)
 
-        return GremlinStream(self.conn,
+        return GremlinStream(self,
                              handler=handler,
-                             force_close=self._force_close)
+                             force_close=self._force_close,
+                             username=self._username,
+                             password=self._password)
 
     @staticmethod
     def _prepare_message(gremlin, bindings, lang, rebindings, op, processor,
                          session):
-        message = json.dumps({
+        message = {
             "requestId": str(uuid.uuid4()),
             "op": op,
             "processor": processor,
@@ -122,7 +128,7 @@ class GremlinConnection(AbstractBaseConnection):
                 "language":  lang,
                 "rebindings": rebindings
             }
-        })
+        }
         if session is None:
             if processor == "session":
                 raise RuntimeError("session processor requires a session id")
@@ -139,6 +145,27 @@ class GremlinConnection(AbstractBaseConnection):
             raise ValueError("Unknown mime type.")
         return b"".join([mime_len, mime_type, message.encode("utf-8")])
 
+    def _authenticate(self, username, password, session=None, processor=""):
+        # Maybe join with submit to avoid repeating code.
+        auth = b"".join([b"\x00", username.encode("utf-8"),
+                         b"\x00", password.encode("utf-8")])
+        message = {
+            "requestId": str(uuid.uuid4()),
+            "op": "authentication",
+            "processor": "",
+            "args": {
+                "sasl": base64.b64encode(auth).decode()
+            }
+        }
+        if session is None:
+            if processor == "session":
+                raise RuntimeError("session processor requires a session id")
+        else:
+            message["args"].update({"session": session})
+        message = json.dumps(message)
+        message = self._set_message_header(message, "application/json")
+        return self.conn.write_message(message, binary=True)
+
 
 class GremlinStream(object):
 
@@ -150,6 +177,7 @@ class GremlinStream(object):
         self._password = password
         self._handler = handler
         self._force_close = force_close
+        self._loop = loop or IOLoop.current()
 
 
     def add_handler(self, func):
@@ -160,9 +188,6 @@ class GremlinStream(object):
         if self._closed:
             future.set_result(None)
         else:
-
-            future_resp = self._conn.read_message()
-
             def parser(f):
                 message = json.loads(f.result().decode("utf-8"))
                 message = Message(message["status"]["code"],
@@ -174,14 +199,18 @@ class GremlinStream(object):
                 if message.status_code == 200:
                     future.set_result(self._handler(message))
                     if self._force_close:
-                        self._conn.close(code=1000)
+                        self._conn.close()
                     self._closed = True
                     self._conn = None
                 elif message.status_code == 206:
                     future.set_result(self._handler(message))
                 elif message.status_code == 407:
-                    # Set up auth/ssl here
-                    pass
+                    self._conn._authenticate(self._username, self._password)
+                    future_read = self.read()
+                    def cb(f):
+                        res = f.result()
+                        future.set_result(res)
+                    self._loop.add_future(future_read, cb)
                 elif message.status_code == 204:
                     future.set_result(self._handler(message))
                     if self._force_close:
@@ -196,26 +225,10 @@ class GremlinStream(object):
                     self._closed = True
                     self._conn = None
 
-            future_resp.add_done_callback(parser)
+            future_resp = self._conn.conn.read_message(
+                callback=parser
+            )
         return future
-
-    # @staticmethod
-    # def _authenticate(username, password, session, processor):
-    #     auth = b"".join([b"\x00", bytes(username, "utf-8"), b"\x00", bytes(password, "utf-8")])
-    #     message = {
-    #         "requestId": str(uuid.uuid4()),
-    #         "op": "authentication",
-    #         "processor": processor,
-    #         "args": {
-    #             "sasl": base64.b64encode(auth).decode()
-    #         }
-    #     }
-    #     if session is None:
-    #         if processor == "session":
-    #             raise RuntimeError("session processor requires a session id")
-    #     else:
-    #         message["args"].update({"session": session})
-    #     return message
 
 
 # def submit(gremlin,

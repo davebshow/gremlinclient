@@ -7,7 +7,8 @@ from tornado.concurrent import Future
 from tornado.websocket import WebSocketClientConnection
 from tornado.testing import gen_test, AsyncTestCase
 from tornado.ioloop import IOLoop
-from gremlinclient import submit, GremlinFactory, GremlinPool, GremlinStream
+from gremlinclient import (
+    submit, GremlinFactory, GremlinPool, GremlinStream, create_connection)
 
 
 class TornadoFactoryConnectTest(AsyncTestCase):
@@ -28,19 +29,19 @@ class TornadoFactoryConnectTest(AsyncTestCase):
 
     @gen_test
     def test_bad_port_exception(self):
-        factory = GremlinFactory(url="ws://localhost:81")
+        factory = GremlinFactory(url="ws://localhost:81/")
         with self.assertRaises(socket.error):
             connection = yield factory.connect()
 
     @gen_test
     def test_wrong_protocol_exception(self):
-        factory = GremlinFactory(url="ws://localhost:8182")
+        factory = GremlinFactory(url="ws://localhost:8182/")
         with self.assertRaises(tornado.httpclient.HTTPError):
             connection = yield factory.connect()
 
     @gen_test
     def test_bad_host_exception(self):
-        factory = GremlinFactory(url="wss://locaost:8182")
+        factory = GremlinFactory(url="wss://locaost:8182/")
         with self.assertRaises(socket.gaierror):
             connection = yield factory.connect()
 
@@ -277,6 +278,14 @@ class TornadoCallbackStyleTest(AsyncTestCase):
 
 
 class TornadoAPITests(AsyncTestCase):
+
+    @gen_test
+    def test_create_connection(self):
+        conn = yield create_connection(
+            url="wss://localhost:8182/", password="password",
+            username="stephen")
+        self.assertIsNotNone(conn.conn.protocol)
+        conn.close()
 
     @gen_test
     def test_submit(self):

@@ -32,6 +32,7 @@ class TornadoFactoryConnectTest(AsyncTestCase):
         try:
             connection = yield factory.connect()
             error = False
+
         except socket.error:
             error = True
         self.assertTrue(error)

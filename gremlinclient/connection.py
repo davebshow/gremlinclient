@@ -72,7 +72,6 @@ class GremlinConnection(AbstractBaseConnection):
                op="eval", processor=None, session=None,
                timeout=None, mime_type="application/json", handler=None):
         """
-        :ref:`coroutine<coroutine>` method.
         Submit a script to the Gremlin Server.
         :param str gremlin: Gremlin script to submit to server.
         :param dict bindings: A mapping of bindings for Gremlin script.

@@ -22,7 +22,6 @@ class GremlinFactory(AbstractBaseFactory):
     def connect(self, force_close=False):
 
         future = Future()
-
         future_conn = websocket_connect(self._url)
 
         def get_conn(f):

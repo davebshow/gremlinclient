@@ -1,3 +1,4 @@
+import socket
 from tornado.concurrent import Future
 from tornado.websocket import websocket_connect
 
@@ -18,21 +19,22 @@ class GremlinFactory(AbstractBaseFactory):
         self._username = username
         self._password = password
 
-    def connect(self):
+    def connect(self, force_close=False):
 
         future = Future()
 
         future_conn = websocket_connect(self._url)
 
         def get_conn(f):
-            conn = f.result()
-            gc = GremlinConnection(conn,
-                                   self._lang,
-                                   self._processor,
-                                   self._timeout,
-                                   self._username,
-                                   self._password)
-            future.set_result(gc)
+            try:
+                conn = f.result()
+            except socket.error as e:
+                future.set_exception(e)
+            else:
+                gc = GremlinConnection(conn, self._lang, self._processor,
+                                       self._timeout, self._username,
+                                       self._password, force_close=force_close)
+                future.set_result(gc)
 
         future_conn.add_done_callback(get_conn)
 

@@ -24,6 +24,7 @@ class _PoolConnectionContextManager(object):
 
 
 class _FactoryConnectionContextManager(object):
+
     __slots__ = ('_conn')
 
     def __init__(self, conn):

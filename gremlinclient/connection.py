@@ -28,7 +28,7 @@ class GremlinConnection(AbstractBaseConnection):
         Usually an instance of ``aiogremlin.connector.GremlinConnector``
     """
     def __init__(self, conn, lang, processor, timeout, username,
-                 password):
+                 password, force_close=False):
         self._conn = conn
         self._lang = lang
         self._processor = processor
@@ -37,6 +37,7 @@ class GremlinConnection(AbstractBaseConnection):
         self._timeout = timeout
         self._username = username
         self._password = password
+        self._force_close = force_close
 
     @property
     def conn(self):
@@ -105,7 +106,9 @@ class GremlinConnection(AbstractBaseConnection):
 
         self.conn.write_message(message, binary=True)
 
-        return GremlinStream(self.conn, handler=handler)
+        return GremlinStream(self.conn,
+                             handler=handler,
+                             force_close=self._force_close)
 
     @staticmethod
     def _prepare_message(gremlin, bindings, lang, rebindings, op, processor,
@@ -141,12 +144,14 @@ class GremlinConnection(AbstractBaseConnection):
 class GremlinStream(object):
 
     def __init__(self, conn, session=None, loop=None, username="",
-                 password="", handler=None):
+                 password="", handler=None, force_close=False):
         self._conn = conn
         self._closed = False
         self._username = username
         self._password = password
         self._handler = handler
+        self._force_close = force_close
+
 
     def add_handler(self, func):
         self._handler = func
@@ -169,7 +174,8 @@ class GremlinStream(object):
                     self._handler = lambda x: x
                 if message.status_code == 200:
                     future.set_result(self._handler(message))
-                    # self._conn.close(code=1000)
+                    if self._force_close:
+                        self._conn.close(code=1000)
                     self._closed = True
                     self._conn = None
                 elif message.status_code == 206:
@@ -179,13 +185,15 @@ class GremlinStream(object):
                     pass
                 elif message.status_code == 204:
                     future.set_result(self._handler(message))
-                    # self._conn.close(code=1000)
+                    if self._force_close:
+                        self._conn.close(code=1000)
                     self._closed = True
                     self._conn = None
                 else:
                     future.set_exception(RuntimeError(
                         "{0} {1}".format(message.status_code, message.message)))
-                    # self._conn.close(code=1006)
+                    if self._force_close:
+                        self._conn.close(code=1006)
                     self._closed = True
                     self._conn = None
 

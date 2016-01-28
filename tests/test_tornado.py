@@ -1,5 +1,6 @@
-from datetime import timedelta
+import socket
 import unittest
+from datetime import timedelta
 import tornado
 from tornado import gen
 from tornado.concurrent import Future
@@ -26,6 +27,16 @@ class TornadoFactoryConnectTest(AsyncTestCase):
         conn.close()
 
     @gen_test
+    def test_conn_error(self):
+        factory = GremlinFactory(url="ws://localhost:81")
+        try:
+            connection = yield factory.connect()
+            error = False
+        except socket.error:
+            error = True
+        self.assertTrue(error)
+
+    @gen_test
     def test_submit(self):
         connection = yield self.factory.connect()
         resp = connection.submit("1 + 1")
@@ -36,6 +47,18 @@ class TornadoFactoryConnectTest(AsyncTestCase):
             self.assertEqual(msg.status_code, 200)
             self.assertEqual(msg.data[0], 2)
         connection.conn.close()
+
+    @gen_test
+    def test_force_close(self):
+        connection = yield self.factory.connect(force_close=True)
+        resp = connection.submit("1 + 1")
+        while True:
+            msg = yield resp.read()
+            if msg is None:
+                break
+            self.assertEqual(msg.status_code, 200)
+            self.assertEqual(msg.data[0], 2)
+        self.assertIsNone(connection.conn.protocol)
 
 class TornadoPoolTest(AsyncTestCase):
 
@@ -150,6 +173,7 @@ class TornadoCtxtMngrTest(AsyncTestCase):
             self.assertFalse(conn.closed)
         self.assertEqual(len(pool.pool), 1)
         self.assertEqual(len(pool._acquired), 0)
+        pool.close()
 
     @gen_test
     def test_factory_manager(self):
@@ -157,6 +181,30 @@ class TornadoCtxtMngrTest(AsyncTestCase):
         with factory.connection() as conn:
             conn = yield conn
             self.assertFalse(conn.closed)
+
+    # @gen_test
+    # def test_pool_callback(self):
+        # This is mogwai style, failing though because the context
+        # manager wants to pass the result of the futre_conn back to
+        # the pool, throws error because future isn't complete.
+        # Need to rethink this.
+        # pool = GremlinPool(maxsize=2)
+        #
+        # def execute(script):
+        #     future = Future()
+        #     with pool.connection() as future_conn:
+        #
+        #         def cb(f):
+        #             conn = f.result()
+        #             stream = conn.submit(script)
+        #             future.set_result(stream)
+        #
+        #         future_conn.add_done_callback(cb)
+        #     return future
+        # result = yield execute("1 + 1")
+        # self.assertIsInstance(result, GremlinStream)
+        # resp = yield result.read()
+        # self.assertEqual(resp.data[0], 2)
 
 
 class TornadoCallbackStyleTest(AsyncTestCase):

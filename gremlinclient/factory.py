@@ -1,6 +1,6 @@
 import socket
 from tornado.concurrent import Future
-from tornado.httpclient import HTTPRequest
+from tornado.httpclient import HTTPRequest, HTTPError
 from tornado.ioloop import IOLoop
 from tornado.websocket import websocket_connect
 
@@ -33,6 +33,10 @@ class GremlinFactory(AbstractBaseFactory):
             try:
                 conn = f.result()
             except socket.error as e:
+                future.set_exception(e)
+            except socket.gaierror as e:
+                future.set_exception(e)
+            except HTTPError as e:
                 future.set_exception(e)
             else:
                 gc = GremlinConnection(conn, self._lang, self._processor,

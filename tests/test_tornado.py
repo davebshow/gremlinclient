@@ -7,9 +7,7 @@ from tornado.concurrent import Future
 from tornado.websocket import WebSocketClientConnection
 from tornado.testing import gen_test, AsyncTestCase
 from tornado.ioloop import IOLoop
-from gremlinclient import GremlinFactory
-from gremlinclient import GremlinPool
-from gremlinclient import GremlinStream
+from gremlinclient import submit, GremlinFactory, GremlinPool, GremlinStream
 
 
 class TornadoFactoryConnectTest(AsyncTestCase):
@@ -29,15 +27,22 @@ class TornadoFactoryConnectTest(AsyncTestCase):
         conn.close()
 
     @gen_test
-    def test_conn_error(self):
+    def test_bad_port_exception(self):
         factory = GremlinFactory(url="ws://localhost:81")
-        try:
+        with self.assertRaises(socket.error):
             connection = yield factory.connect()
-            error = False
 
-        except socket.error:
-            error = True
-        self.assertTrue(error)
+    @gen_test
+    def test_wrong_protocol_exception(self):
+        factory = GremlinFactory(url="ws://localhost:8182")
+        with self.assertRaises(tornado.httpclient.HTTPError):
+            connection = yield factory.connect()
+
+    @gen_test
+    def test_bad_host_exception(self):
+        factory = GremlinFactory(url="wss://locaost:8182")
+        with self.assertRaises(socket.gaierror):
+            connection = yield factory.connect()
 
     @gen_test
     def test_submit(self):
@@ -49,6 +54,18 @@ class TornadoFactoryConnectTest(AsyncTestCase):
                 break
             self.assertEqual(msg.status_code, 200)
             self.assertEqual(msg.data[0], 2)
+        connection.conn.close()
+
+    @gen_test
+    def test_creditials_error(self):
+        factory = GremlinFactory("wss://localhost:8182/",
+                                 username="stephen",
+                                 password="passwor")
+        connection = yield factory.connect()
+        resp = connection.submit("1 + 1")
+        with self.assertRaises(RuntimeError):
+            msg = yield resp.read()
+
         connection.conn.close()
 
     @gen_test
@@ -112,12 +129,8 @@ class TornadoPoolTest(AsyncTestCase):
         c2 = yield pool.acquire()
         c3 = pool.acquire()
         self.assertIsInstance(c3, Future)
-        try:
+        with self.assertRaises(tornado.gen.TimeoutError):
             yield gen.with_timeout(timedelta(seconds=0.1), c3)
-            error = False
-        except tornado.gen.TimeoutError:
-            error = True
-        self.assertTrue(error)
         c1.conn.close()
         c2.conn.close()
 
@@ -144,12 +157,8 @@ class TornadoPoolTest(AsyncTestCase):
         c2 = yield pool.acquire()
         c3 = pool.acquire()
         self.assertIsInstance(c3, Future)
-        try:
+        with self.assertRaises(tornado.gen.TimeoutError):
             yield gen.with_timeout(timedelta(seconds=0.1), c3)
-            error = False
-        except tornado.gen.TimeoutError:
-            error = True
-        self.assertTrue(error)
         pool.release(c2)
         c3 = yield c3
         self.assertEqual(c2, c3)
@@ -266,98 +275,95 @@ class TornadoCallbackStyleTest(AsyncTestCase):
         resp = yield result.read()
         self.assertEqual(resp.data[0], 2)
 
-#     # def setUp(self):
-#     #     super(Py27SyntaxTest, self).setUp()
-#     #     self.loop = IOLoop.current()
-#     #
-#     # @gen_test
-#     # def test_submit(self):
-#     #
-#     #     fut = submit("1 + 1")
-#     #     res = yield fut
-#     #     while True:
-#     #         msg = yield res.read()
-#     #         if msg is None:
-#     #             break
-#     #         self.assertEqual(msg.status_code, 200)
-#     #         self.assertEqual(msg.data[0], 2)
-#     #
-#     # @gen_test(timeout=1)
-#     # def test_exception(self):
-#     #
-#     #     with self.assertRaises(RuntimeError):
-#     #         fut = submit("throw new Exception('error')")
-#     #         res = yield fut
-#     #         while True:
-#     #             msg = yield res.read()
-#     #             if msg is None:
-#     #                 break
-#     #
-#     # # These should be gen_test
-#     # def test_add_handler(self):
-#     #
-#     #     class Dummy(object):
-#     #         def __init__(self):
-#     #             self.results = None
-#     #
-#     #         def req(self):
-#     #             future = Future()
-#     #             future_results = submit("1 + 1")
-#     #
-#     #             def process_results(results):
-#     #                 self.results = results.data
-#     #                 return results
-#     #
-#     #             def set_processor(f):
-#     #                 result = f.result()
-#     #                 result.add_handler(process_results)
-#     #                 future.set_result(result)
-#     #
-#     #             future_results.add_done_callback(set_processor)
-#     #
-#     #             return future
-#     #
-#     #     @gen.coroutine
-#     #     def go():
-#     #         dummy = Dummy()
-#     #         resp = yield dummy.req()
-#     #         while True:
-#     #             msg = yield resp.read()
-#     #             if msg is None:
-#     #                 break
-#     #             self.assertEqual(dummy.results, msg.data)
-#     #
-#     #     self.loop.run_sync(go)
-#     #
-#     #
-#     # def test_pass_handler(self):
-#     #
-#     #     class Dummy(object):
-#     #         def __init__(self):
-#     #             self.results = None
-#     #
-#     #         def req(self, cond):
-#     #
-#     #             def process_results(results):
-#     #                 if not cond:
-#     #                     self.results = results.data
-#     #                 return results
-#     #
-#     #             future_results = submit("1 + 1", handler=process_results)
-#     #
-#     #             return future_results
-#     #
-#     #     @gen.coroutine
-#     #     def go():
-#     #         dummy = Dummy()
-#     #         resp = yield dummy.req(False)
-#     #         while True:
-#     #             msg = yield resp.read()
-#     #             if msg is None:
-#     #                 break
-#     #             self.assertEqual(dummy.results, msg.data)
-#     #
-#     #     self.loop.run_sync(go)
+
+class TornadoAPITests(AsyncTestCase):
+
+    @gen_test
+    def test_submit(self):
+        stream = yield submit(
+            "1 + 1", url="wss://localhost:8182/",
+            password="password", username="stephen")
+        while True:
+            msg = yield stream.read()
+            if msg is None:
+                break
+            self.assertEqual(msg.status_code, 200)
+            self.assertEqual(msg.data[0], 2)
+
+    @gen_test(timeout=1)
+    def test_script_exception(self):
+        with self.assertRaises(RuntimeError):
+            stream = yield submit("throw new Exception('error')",
+                         url="wss://localhost:8182/",
+                         password="password", username="stephen")
+            yield stream.read()
+
+
+    # These should be gen_test
+    # def test_add_handler(self):
+    #
+    #     class Dummy(object):
+    #         def __init__(self):
+    #             self.results = None
+    #
+    #         def req(self):
+    #             future = Future()
+    #             future_results = submit("1 + 1")
+    #
+    #             def process_results(results):
+    #                 self.results = results.data
+    #                 return results
+    #
+    #             def set_processor(f):
+    #                 result = f.result()
+    #                 result.add_handler(process_results)
+    #                 future.set_result(result)
+    #
+    #             future_results.add_done_callback(set_processor)
+    #
+    #             return future
+    #
+    #     @gen.coroutine
+    #     def go():
+    #         dummy = Dummy()
+    #         resp = yield dummy.req()
+    #         while True:
+    #             msg = yield resp.read()
+    #             if msg is None:
+    #                 break
+    #             self.assertEqual(dummy.results, msg.data)
+    #
+    #     self.loop.run_sync(go)
+    #
+    #
+    # def test_pass_handler(self):
+    #
+    #     class Dummy(object):
+    #         def __init__(self):
+    #             self.results = None
+    #
+    #         def req(self, cond):
+    #
+    #             def process_results(results):
+    #                 if not cond:
+    #                     self.results = results.data
+    #                 return results
+    #
+    #             future_results = submit("1 + 1", handler=process_results)
+    #
+    #             return future_results
+
+        # @gen.coroutine
+        # def go():
+        #     dummy = Dummy()
+        #     resp = yield dummy.req(False)
+        #     while True:
+        #         msg = yield resp.read()
+        #         if msg is None:
+        #             break
+        #         self.assertEqual(dummy.results, msg.data)
+        #
+        # self.loop.run_sync(go)
 
 
 if __name__ == "__main__":

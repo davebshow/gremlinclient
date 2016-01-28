@@ -71,7 +71,7 @@ class GremlinConnection(AbstractBaseConnection):
         self._conn.close()
         self._closed = True
 
-    def submit(self, gremlin="", bindings=None, lang=None, rebindings=None,
+    def submit(self, gremlin, bindings=None, lang=None, rebindings=None,
                op="eval", processor=None, session=None,
                timeout=None, mime_type="application/json", handler=None):
         """
@@ -189,68 +189,54 @@ class GremlinStream(object):
             future.set_result(None)
         else:
             def parser(f):
-                message = json.loads(f.result().decode("utf-8"))
-                message = Message(message["status"]["code"],
-                                  message["result"]["data"],
-                                  message["status"]["message"],
-                                  message["result"]["meta"])
-                if self._handler is None:
-                    self._handler = lambda x: x
-                if message.status_code == 200:
-                    future.set_result(self._handler(message))
-                    if self._force_close:
-                        self._conn.close()
-                    self._closed = True
-                    self._conn = None
-                elif message.status_code == 206:
-                    future.set_result(self._handler(message))
-                elif message.status_code == 407:
-                    self._conn._authenticate(self._username, self._password)
-                    future_read = self.read()
-                    def cb(f):
-                        res = f.result()
-                        future.set_result(res)
-                    self._loop.add_future(future_read, cb)
-                elif message.status_code == 204:
-                    future.set_result(self._handler(message))
-                    if self._force_close:
-                        self._conn.close(code=1000)
-                    self._closed = True
-                    self._conn = None
+                try:
+                    result = f.result()
+                except Exception as e:
+                    future.set_exception(e)
                 else:
-                    future.set_exception(RuntimeError(
-                        "{0} {1}".format(message.status_code, message.message)))
-                    if self._force_close:
-                        self._conn.close(code=1006)
-                    self._closed = True
-                    self._conn = None
+                    message = json.loads(result.decode("utf-8"))
+                    message = Message(message["status"]["code"],
+                                      message["result"]["data"],
+                                      message["status"]["message"],
+                                      message["result"]["meta"])
+                    if self._handler is None:
+                        self._handler = lambda x: x
+                    if message.status_code == 200:
+                        future.set_result(self._handler(message))
+                        if self._force_close:
+                            self._conn.close()
+                        self._closed = True
+                        self._conn = None
+                    elif message.status_code == 206:
+                        future.set_result(self._handler(message))
+                    elif message.status_code == 407:
+                        self._conn._authenticate(
+                            self._username, self._password)
+                        future_read = self.read()
+                        def cb(f):
+                            try:
+                                res = f.result()
+                            except Exception as e:
+                                future.set_exception(e)
+                            else:
+                                future.set_result(res)
+                        self._loop.add_future(future_read, cb)
+                    elif message.status_code == 204:
+                        future.set_result(self._handler(message))
+                        if self._force_close:
+                            self._conn.close()
+                        self._closed = True
+                        self._conn = None
+                    else:
+                        future.set_exception(
+                            RuntimeError("{0} {1}".format(
+                                message.status_code, message.message)))
+                        if self._force_close:
+                            self._conn.close()
+                        self._closed = True
+                        self._conn = None
 
             future_resp = self._conn.conn.read_message(
                 callback=parser
             )
         return future
-
-
-# def submit(gremlin,
-#            url='ws://localhost:8182/',
-#            bindings=None,
-#            lang="gremlin-groovy",
-#            rebindings=None,
-#            op="eval",
-#            processor="",
-#            timeout=None,
-#            session=None,
-#            loop=None,
-#            username="",
-#            password="",
-#            handler=None):
-#
-#     gc = GremlinConnection(url=url, username=username, password=password)
-#     try:
-#         future_resp = gc.submit(gremlin, bindings=bindings, lang=lang,
-#                                 rebindings=rebindings, op=op,
-#                                 processor=processor, session=session,
-#                                 timeout=timeout, handler=handler)
-#         return future_resp
-#     finally:
-#         gc.close()

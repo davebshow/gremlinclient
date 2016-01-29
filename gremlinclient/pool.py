@@ -1,6 +1,6 @@
 import collections
 
-from tornado.concurrent import Future
+from tornado import concurrent
 from tornado.ioloop import IOLoop
 
 from gremlinclient.factory import GremlinFactory
@@ -11,7 +11,8 @@ class GremlinPool(object):
 
     def __init__(self, url='ws://localhost:8182/', lang="gremlin-groovy",
                  processor="", timeout=None, username="", password="",
-                 factory=None, maxsize=256, loop=None, force_release=False):
+                 factory=None, maxsize=256, loop=None, force_release=False,
+                 future_class=None):
         self._maxsize = maxsize
         self._pool = collections.deque()
         self._waiters = collections.deque()
@@ -20,6 +21,7 @@ class GremlinPool(object):
         self._closed = False
         self._loop = loop or IOLoop.current()
         self._force_release = force_release
+        self._future_class = future_class or concurrent.Future
         # This may change depending on how other factories are passed
         self._factory = factory or GremlinFactory(url=url,
                                                   lang=lang,
@@ -58,7 +60,7 @@ class GremlinPool(object):
 
     def acquire(self):
         # maybe have max connection open time here
-        future = Future()
+        future = self._future_class()
         if self._pool:
             conn = self._pool.popleft()
             future.set_result(conn)

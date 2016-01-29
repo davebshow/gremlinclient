@@ -22,7 +22,7 @@ class AsyncioSyntaxTest(unittest.TestCase):
         self.factory = GremlinFactory("wss://localhost:8182/",
                                       username="stephen",
                                       password="password",
-                                      future_type=asyncio.Future)
+                                      future_class=asyncio.Future)
 
 
     def test_connect(self):

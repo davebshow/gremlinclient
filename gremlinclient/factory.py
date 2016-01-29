@@ -16,7 +16,7 @@ class GremlinFactory(AbstractBaseFactory):
 
     def __init__(self, url='ws://localhost:8182/', lang="gremlin-groovy",
                  processor="", timeout=None, username="", password="",
-                 loop=None, validate_cert=False, future_type=None):
+                 loop=None, validate_cert=False, future_class=None):
         self._url = url
         self._lang = lang
         self._processor = processor
@@ -25,11 +25,11 @@ class GremlinFactory(AbstractBaseFactory):
         self._password = password
         self._loop = loop or IOLoop.current()
         self._validate_cert = validate_cert
-        self._future = future_type or concurrent.Future
+        self._future_class = future_class or concurrent.Future
 
     def connect(self, force_close=False, force_release=False, pool=None):
         request = HTTPRequest(self._url, validate_cert=self._validate_cert)
-        future = self._future()
+        future = self._future_class()
         future_conn = websocket_connect(request)
 
         def get_conn(f):
@@ -46,7 +46,7 @@ class GremlinFactory(AbstractBaseFactory):
                                        self._timeout, self._username,
                                        self._password, force_close=force_close,
                                        force_release=force_release, pool=pool,
-                                       future_type=self._future)
+                                       future_class=self._future_class)
                 future.set_result(gc)
         future_conn.add_done_callback(get_conn)
         return future

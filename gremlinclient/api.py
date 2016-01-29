@@ -18,7 +18,7 @@ def submit(gremlin,
            password="",
            handler=None,
            validate_cert=False,
-           future_type=None):
+           future_class=None):
 
     loop = loop or IOLoop.current()
     factory = GremlinFactory(url=url, lang=lang,
@@ -28,8 +28,8 @@ def submit(gremlin,
                              password=password,
                              loop=loop,
                              validate_cert=validate_cert)
-    future_type = future_type or concurrent.Future
-    future = future_type()
+    future_class = future_class or concurrent.Future
+    future = future_class()
     future_conn = factory.connect(force_close=True)
 
     def on_connect(f):
@@ -53,7 +53,7 @@ def submit(gremlin,
 def create_connection(url='ws://localhost:8182/', lang="gremlin-groovy",
                       processor="", timeout=None, username="", password="",
                       loop=None, validate_cert=False, force_close=False,
-                      future_type=None):
+                      future_class=None):
     loop = loop or IOLoop.current()
     factory = GremlinFactory(url=url, lang=lang,
                              processor=processor,
@@ -62,5 +62,5 @@ def create_connection(url='ws://localhost:8182/', lang="gremlin-groovy",
                              password=password,
                              loop=loop,
                              validate_cert=validate_cert,
-                             future_type=future_type)
+                             future_class=future_class)
     return factory.connect(force_close=force_close)

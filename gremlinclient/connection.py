@@ -31,7 +31,7 @@ class GremlinConnection(AbstractBaseConnection):
     """
     def __init__(self, conn, lang, processor, timeout, username, password,
                  force_close=False, force_release=False, loop=None, pool=None,
-                 future_type=None):
+                 future_class=None):
         self._conn = conn
         self._lang = lang
         self._processor = processor
@@ -44,7 +44,7 @@ class GremlinConnection(AbstractBaseConnection):
         self._force_release = force_release
         self._loop = loop or IOLoop.current()
         self._pool = pool
-        self._future = future_type or concurrent.Future
+        self._future_class = future_class or concurrent.Future
 
     def release(self):
         if self._pool:
@@ -181,7 +181,7 @@ class GremlinStream(object):
 
     def __init__(self, conn, session=None, loop=None, username="",
                  password="", handler=None, force_close=False,
-                 force_release=False, future_type=None):
+                 force_release=False, future_class=None):
         self._conn = conn
         self._closed = False
         self._username = username
@@ -190,13 +190,13 @@ class GremlinStream(object):
         self._force_close = force_close
         self._force_release = force_release
         self._loop = loop or IOLoop.current()
-        self._future = future_type or concurrent.Future
+        self._future_class = future_class or concurrent.Future
 
     def add_handler(self, func):
         self._handler = func
 
     def read(self):
-        future = self._future()
+        future = self._future_class()
         if self._closed:
             future.set_result(None)
         else:

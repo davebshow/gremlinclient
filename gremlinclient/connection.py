@@ -29,8 +29,8 @@ class GremlinConnection(AbstractBaseConnection):
     :param connector: A class that implements the method ``ws_connect``.
         Usually an instance of ``aiogremlin.connector.GremlinConnector``
     """
-    def __init__(self, conn, lang, processor, timeout, username,
-                 password, force_close=False, loop=None):
+    def __init__(self, conn, lang, processor, timeout, username, password,
+                 force_close=False, force_release=False, loop=None, pool=None):
         self._conn = conn
         self._lang = lang
         self._processor = processor
@@ -40,7 +40,13 @@ class GremlinConnection(AbstractBaseConnection):
         self._username = username
         self._password = password
         self._force_close = force_close
+        self._force_release = force_release
         self._loop = loop or IOLoop.current()
+        self._pool = pool
+
+    def release(self):
+        if self._pool:
+            self._pool.release(self)
 
     @property
     def conn(self):
@@ -112,6 +118,7 @@ class GremlinConnection(AbstractBaseConnection):
         return GremlinStream(self,
                              handler=handler,
                              force_close=self._force_close,
+                             force_release=self._force_release,
                              username=self._username,
                              password=self._password)
 
@@ -170,15 +177,16 @@ class GremlinConnection(AbstractBaseConnection):
 class GremlinStream(object):
 
     def __init__(self, conn, session=None, loop=None, username="",
-                 password="", handler=None, force_close=False):
+                 password="", handler=None, force_close=False,
+                 force_release=False):
         self._conn = conn
         self._closed = False
         self._username = username
         self._password = password
         self._handler = handler
         self._force_close = force_close
+        self._force_release = force_release
         self._loop = loop or IOLoop.current()
-
 
     def add_handler(self, func):
         self._handler = func
@@ -205,6 +213,8 @@ class GremlinStream(object):
                         future.set_result(self._handler(message))
                         if self._force_close:
                             self._conn.close()
+                        if self._force_release:
+                            self._conn.release()
                         self._closed = True
                         self._conn = None
                     elif message.status_code == 206:
@@ -215,16 +225,18 @@ class GremlinStream(object):
                         future_read = self.read()
                         def cb(f):
                             try:
-                                res = f.result()
+                                result = f.result()
                             except Exception as e:
                                 future.set_exception(e)
                             else:
-                                future.set_result(res)
+                                future.set_result(result)
                         self._loop.add_future(future_read, cb)
                     elif message.status_code == 204:
                         future.set_result(self._handler(message))
                         if self._force_close:
                             self._conn.close()
+                        if self._force_release:
+                            self._conn.release()
                         self._closed = True
                         self._conn = None
                     else:
@@ -233,10 +245,10 @@ class GremlinStream(object):
                                 message.status_code, message.message)))
                         if self._force_close:
                             self._conn.close()
+                        if self._force_release:
+                            self._conn.release()
                         self._closed = True
                         self._conn = None
 
-            future_resp = self._conn.conn.read_message(
-                callback=parser
-            )
+            future_resp = self._conn.conn.read_message(callback=parser)
         return future

@@ -11,7 +11,7 @@ class GremlinPool(object):
 
     def __init__(self, url='ws://localhost:8182/', lang="gremlin-groovy",
                  processor="", timeout=None, username="", password="",
-                 factory=None, maxsize=256, loop=None):
+                 factory=None, maxsize=256, loop=None, force_release=False):
         self._maxsize = maxsize
         self._pool = collections.deque()
         self._waiters = collections.deque()
@@ -19,6 +19,7 @@ class GremlinPool(object):
         self._acquiring = 0
         self._closed = False
         self._loop = loop or IOLoop.current()
+        self._force_release = force_release
         # This may change depending on how other factories are passed
         self._factory = factory or GremlinFactory(url=url,
                                                   lang=lang,
@@ -64,7 +65,8 @@ class GremlinPool(object):
             self.acquired.add(conn)
         elif self.size < self.maxsize:
             self._acquiring += 1
-            conn_future = self.factory.connect()
+            conn_future = self.factory.connect(
+                force_release=self._force_release, pool=self)
             def cb(f):
                 conn = f.result()
                 self._acquiring -= 1

@@ -149,6 +149,21 @@ class TornadoPoolTest(AsyncTestCase):
         self.assertEqual(len(pool._acquired), 0)
 
     @gen_test
+    def test_self_release(self):
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password",
+                           force_release=True)
+        self.assertEqual(len(pool.pool), 0)
+        c1 = yield pool.acquire()
+        self.assertEqual(len(pool._acquired), 1)
+        stream = c1.submit("1 + 1")
+        resp = yield stream.read()
+        self.assertEqual(len(pool.pool), 1)
+        self.assertEqual(len(pool._acquired), 0)
+
+    @gen_test
     def test_maxsize_release(self):
         pool = GremlinPool(url="wss://localhost:8182/",
                            maxsize=2,

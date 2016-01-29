@@ -1,4 +1,6 @@
 import socket
+import sys
+
 from tornado.concurrent import Future
 from tornado.httpclient import HTTPRequest, HTTPError
 from tornado.ioloop import IOLoop
@@ -24,7 +26,7 @@ class GremlinFactory(AbstractBaseFactory):
         self._loop = loop or IOLoop.current()
         self._validate_cert = validate_cert
 
-    def connect(self, force_close=False):
+    def connect(self, force_close=False, force_release=False, pool=None):
         request = HTTPRequest(self._url, validate_cert=self._validate_cert)
         future = Future()
         future_conn = websocket_connect(request)
@@ -32,16 +34,17 @@ class GremlinFactory(AbstractBaseFactory):
         def get_conn(f):
             try:
                 conn = f.result()
-            except socket.error as e:
-                future.set_exception(e)
-            except socket.gaierror as e:
-                future.set_exception(e)
-            except HTTPError as e:
-                future.set_exception(e)
+            except socket.error:
+                future.set_exc_info(sys.exc_info())
+            except socket.gaierror:
+                future.set_exc_info(sys.exc_info())
+            except HTTPError:
+                future.set_exc_info(sys.exc_info())
             else:
                 gc = GremlinConnection(conn, self._lang, self._processor,
                                        self._timeout, self._username,
-                                       self._password, force_close=force_close)
+                                       self._password, force_close=force_close,
+                                       force_release=force_release, pool=pool)
                 future.set_result(gc)
 
         self._loop.add_future(future_conn, get_conn)

@@ -23,7 +23,7 @@ class _PoolConnectionContextManager(object):
             self._conn = None
 
 
-class _FactoryConnectionContextManager(object):
+class _GraphConnectionContextManager(object):
 
     __slots__ = ('_conn')
 

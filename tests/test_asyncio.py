@@ -1,39 +1,464 @@
+import unittest
 import asyncio
+from asyncio import Future
 import socket
 import unittest
 from datetime import timedelta
 import tornado
-from tornado import gen
-from tornado.concurrent import Future
-from tornado.platform.asyncio import AsyncIOMainLoop
 from tornado.websocket import WebSocketClientConnection
-from tornado.testing import gen_test, AsyncTestCase
-from tornado.ioloop import IOLoop
+from tornado.platform.asyncio import AsyncIOMainLoop
 from gremlinclient import (
-    submit, GremlinFactory, GremlinPool, GremlinStream, create_connection)
+    submit, GraphDatabase, GremlinPool, GremlinStream, create_connection)
 
 
-
-class AsyncioSyntaxTest(unittest.TestCase):
+class AsyncioFactoryConnectTest(unittest.TestCase):
 
     def setUp(self):
-        AsyncIOMainLoop().install()
+        try:
+            AsyncIOMainLoop().install()
+        except AssertionError:
+            pass
         self.loop = asyncio.get_event_loop()
-        self.factory = GremlinFactory("wss://localhost:8182/",
-                                      username="stephen",
-                                      password="password",
-                                      future_class=asyncio.Future)
-
+        self.graph = GraphDatabase("wss://localhost:8182/",
+                                   username="stephen",
+                                   password="password",
+                                   loop=self.loop,
+                                   future_class=Future)
 
     def test_connect(self):
 
         @asyncio.coroutine
         def go():
-            connection = yield from self.factory.connect()
+            connection = yield from self.graph.connect()
             conn = connection.conn
             self.assertIsNotNone(conn.protocol)
             self.assertIsInstance(conn, WebSocketClientConnection)
             conn.close()
+
+        self.loop.run_until_complete(go())
+
+
+    def test_bad_port_exception(self):
+        graph = GraphDatabase(url="ws://localhost:81/", loop=self.loop,
+                              future_class=Future)
+
+        @asyncio.coroutine
+        def go():
+            with self.assertRaises(RuntimeError):
+                connection = yield from graph.connect()
+
+        self.loop.run_until_complete(go())
+
+
+    def test_wrong_protocol_exception(self):
+        graph = GraphDatabase(url="ws://localhost:8182/", loop=self.loop,
+                              future_class=Future)
+        @asyncio.coroutine
+        def go():
+            with self.assertRaises(tornado.httpclient.HTTPError):
+                connection = yield from graph.connect()
+
+        self.loop.run_until_complete(go())
+
+
+    def test_bad_host_exception(self):
+        graph = GraphDatabase(url="wss://locaost:8182/", loop=self.loop,
+                              future_class=Future)
+
+        @asyncio.coroutine
+        def go():
+            with self.assertRaises(RuntimeError):
+                connection = yield from graph.connect()
+
+        self.loop.run_until_complete(go())
+
+    def test_submit(self):
+
+        @asyncio.coroutine
+        def go():
+            connection = yield from self.graph.connect()
+            resp = connection.submit("1 + 1")
+            while True:
+                msg = yield from resp.read()
+                if msg is None:
+                    break
+                self.assertEqual(msg.status_code, 200)
+                self.assertEqual(msg.data[0], 2)
+            connection.conn.close()
+
+        self.loop.run_until_complete(go())
+
+    def test_read_one_on_closed(self):
+
+        @asyncio.coroutine
+        def go():
+            connection = yield from self.graph.connect()
+            resp = connection.submit("1 + 1")
+            connection.close()
+            with self.assertRaises(RuntimeError):
+                msg = yield from resp.read()
+
+        self.loop.run_until_complete(go())
+
+    def test_null_read_on_closed(self):
+
+        @asyncio.coroutine
+        def go():
+            connection = yield from self.graph.connect()
+            # build connection
+            connection.close()
+            stream = GremlinStream(connection, future_class=Future)
+            with self.assertRaises(RuntimeError):
+                msg = yield from stream.read()
+
+        self.loop.run_until_complete(go())
+
+    def test_creditials_error(self):
+
+        @asyncio.coroutine
+        def go():
+            graph = GraphDatabase("wss://localhost:8182/",
+                                  username="stephen",
+                                  password="passwor",
+                                  loop=self.loop,
+                                  future_class=Future)
+            connection = yield from graph.connect()
+            resp = connection.submit("1 + 1")
+            with self.assertRaises(RuntimeError):
+                msg = yield from resp.read()
+            connection.conn.close()
+
+        self.loop.run_until_complete(go())
+
+    def test_force_close(self):
+
+        @asyncio.coroutine
+        def go():
+            connection = yield from self.graph.connect(force_close=True)
+            resp = connection.submit("1 + 1")
+            while True:
+                msg = yield from resp.read()
+                if msg is None:
+                    break
+                self.assertEqual(msg.status_code, 200)
+                self.assertEqual(msg.data[0], 2)
+            self.assertIsNone(connection.conn.protocol)
+
+        self.loop.run_until_complete(go())
+
+class AsyncioPoolTest(unittest.TestCase):
+
+    def setUp(self):
+        try:
+            AsyncIOMainLoop().install()
+        except AssertionError:
+            pass
+        self.loop = asyncio.get_event_loop()
+
+    def test_acquire(self):
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password",
+                           loop=self.loop,
+                           future_class=Future)
+
+        @asyncio.coroutine
+        def go():
+            connection = yield from pool.acquire()
+            conn = connection.conn
+            self.assertIsNotNone(conn.protocol)
+            self.assertIsInstance(conn, WebSocketClientConnection)
+            self.assertEqual(pool.size, 1)
+            self.assertTrue(connection in pool._acquired)
+            connection2 = yield from pool.acquire()
+            conn2 = connection.conn
+            self.assertIsNotNone(conn2.protocol)
+            self.assertIsInstance(conn2, WebSocketClientConnection)
+            self.assertEqual(pool.size, 2)
+            self.assertTrue(connection2 in pool._acquired)
+            conn.close()
+            conn2.close()
+
+        self.loop.run_until_complete(go())
+
+
+    def test_acquire_submit(self):
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password",
+                           loop=self.loop,
+                           future_class=Future)
+
+        @asyncio.coroutine
+        def go():
+            connection = yield from pool.acquire()
+            resp = connection.submit("1 + 1")
+            while True:
+                msg = yield from resp.read()
+                if msg is None:
+                    break
+                self.assertEqual(msg.status_code, 200)
+                self.assertEqual(msg.data[0], 2)
+            connection.conn.close()
+
+        self.loop.run_until_complete(go())
+
+    def test_maxsize(self):
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password",
+                           loop=self.loop,
+                           future_class=Future)
+
+        @asyncio.coroutine
+        def go():
+            c1 = yield from pool.acquire()
+            c2 = yield from pool.acquire()
+            c3 = pool.acquire()
+            self.assertIsInstance(c3, Future)
+            with self.assertRaises(asyncio.TimeoutError):
+                yield from asyncio.wait_for(c3, 0.1)
+            c1.conn.close()
+            c2.conn.close()
+
+        self.loop.run_until_complete(go())
+
+    def test_release(self):
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password",
+                           loop=self.loop,
+                           future_class=Future)
+
+        @asyncio.coroutine
+        def go():
+            self.assertEqual(len(pool.pool), 0)
+            c1 = yield from pool.acquire()
+            self.assertEqual(len(pool._acquired), 1)
+            pool.release(c1)
+            self.assertEqual(len(pool.pool), 1)
+            self.assertEqual(len(pool._acquired), 0)
+
+        self.loop.run_until_complete(go())
+
+    def test_self_release(self):
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password",
+                           force_release=True,
+                           future_class=Future,
+                           loop=self.loop)
+
+        @asyncio.coroutine
+        def go():
+            self.assertEqual(len(pool.pool), 0)
+            c1 = yield from pool.acquire()
+            self.assertEqual(len(pool._acquired), 1)
+            stream = c1.submit("1 + 1")
+            resp = yield from stream.read()
+            self.assertEqual(len(pool.pool), 1)
+            self.assertEqual(len(pool._acquired), 0)
+
+        self.loop.run_until_complete(go())
+
+    def test_maxsize_release(self):
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password",
+                           future_class=Future)
+
+        @asyncio.coroutine
+        def go():
+            c1 = yield from pool.acquire()
+            c2 = yield from pool.acquire()
+            c3 = pool.acquire()
+            self.assertIsInstance(c3, Future)
+            with self.assertRaises(asyncio.TimeoutError):
+                shielded_fut = asyncio.shield(c3)
+                yield from asyncio.wait_for(shielded_fut, 0.1)
+            pool.release(c2)
+            c3 = yield from c3
+            self.assertEqual(c2, c3)
+            c1.conn.close()
+            c2.conn.close()
+            c3.conn.close()
+
+        self.loop.run_until_complete(go())
+
+    def test_close(self):
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password",
+                           future_class=Future)
+
+        @asyncio.coroutine
+        def go():
+            c1 = yield from pool.acquire()
+            c2 = yield from pool.acquire()
+            pool.release(c2)
+            pool.close()
+            self.assertIsNone(c2.conn.protocol)
+            self.assertIsNotNone(c1.conn.protocol)
+            c1.close()
+
+        self.loop.run_until_complete(go())
+
+    def test_cancelled(self):
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password",
+                           future_class=Future)
+
+        @asyncio.coroutine
+        def go():
+            c1 = yield from pool.acquire()
+            c2 = yield from pool.acquire()
+            c3 = pool.acquire()
+            pool.close()
+            self.assertTrue(c3.cancelled())
+            c1.close()
+            c2.close()
+
+        self.loop.run_until_complete(go())
+
+class AsyncioCtxtMngrTest(unittest.TestCase):
+
+    def setUp(self):
+        try:
+            AsyncIOMainLoop().install()
+        except AssertionError:
+            pass
+        self.loop = asyncio.get_event_loop()
+
+    def test_pool_manager(self):
+        pool = GremlinPool(url="wss://localhost:8182/",
+                           maxsize=2,
+                           username="stephen",
+                           password="password",
+                           loop=self.loop,
+                           future_class=Future)
+
+        @asyncio.coroutine
+        def go():
+            with pool.connection() as conn:
+                conn = yield from conn
+                self.assertFalse(conn.closed)
+            self.assertEqual(len(pool.pool), 1)
+            self.assertEqual(len(pool._acquired), 0)
+            pool.close()
+
+    def test_graph_manager(self):
+        graph = GraphDatabase(url="wss://localhost:8182/",
+                              username="stephen",
+                              password="password",
+                              loop=self.loop,
+                              future_class=Future)
+
+        @asyncio.coroutine
+        def go():
+            with graph.connection() as conn:
+                conn = yield from conn
+                self.assertFalse(conn.closed)
+
+class AsyncioCallbackStyleTest(unittest.TestCase):
+
+    def setUp(self):
+        try:
+            AsyncIOMainLoop().install()
+        except AssertionError:
+            pass
+        self.loop = asyncio.get_event_loop()
+
+    def test_data_flow(self):
+
+        def execute(script):
+            future = Future()
+            graph = GraphDatabase(url="wss://localhost:8182/",
+                                  username="stephen",
+                                  password="password",
+                                  loop=self.loop,
+                                  future_class=Future)
+            future_conn = graph.connect()
+
+            def cb(f):
+                conn = f.result()
+                stream = conn.submit(script)
+                future.set_result(stream)
+
+            future_conn.add_done_callback(cb)
+
+            return future
+
+        @asyncio.coroutine
+        def go():
+            result = yield from execute("1 + 1")
+            self.assertIsInstance(result, GremlinStream)
+            resp = yield from result.read()
+            self.assertEqual(resp.data[0], 2)
+
+        self.loop.run_until_complete(go())
+
+
+class AsyncioAPITests(unittest.TestCase):
+
+    def setUp(self):
+        try:
+            AsyncIOMainLoop().install()
+        except AssertionError:
+            pass
+        self.loop = asyncio.get_event_loop()
+
+    def test_create_connection(self):
+
+        @asyncio.coroutine
+        def go():
+            conn = yield from create_connection(
+                url="wss://localhost:8182/", password="password",
+                username="stephen", loop=self.loop, future_class=Future)
+            self.assertIsNotNone(conn.conn.protocol)
+            conn.close()
+
+        self.loop.run_until_complete(go())
+
+
+    def test_submit(self):
+
+        @asyncio.coroutine
+        def go():
+            stream = yield from submit(
+                "1 + 1", url="wss://localhost:8182/",
+                password="password", username="stephen", loop=self.loop,
+                future_class=Future)
+            while True:
+                msg = yield from stream.read()
+                if msg is None:
+                    break
+                self.assertEqual(msg.status_code, 200)
+                self.assertEqual(msg.data[0], 2)
+
+        self.loop.run_until_complete(go())
+
+    def test_script_exception(self):
+
+        @asyncio.coroutine
+        def go():
+            with self.assertRaises(RuntimeError):
+                stream = yield from submit("throw new Exception('error')",
+                                      url="wss://localhost:8182/",
+                                      password="password", username="stephen",
+                                      loop=self.loop, future_class=Future)
+                yield from stream.read()
+
+        self.loop.run_until_complete(go())
+
 
 
 if __name__ == "__main__":

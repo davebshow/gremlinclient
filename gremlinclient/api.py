@@ -1,7 +1,7 @@
 from tornado import concurrent
 from tornado.ioloop import IOLoop
 
-from gremlinclient.factory import GremlinFactory
+from gremlinclient.graph import GraphDatabase
 
 
 def submit(gremlin,
@@ -20,16 +20,17 @@ def submit(gremlin,
            future_class=None):
 
     loop = loop or IOLoop.current()
-    factory = GremlinFactory(url=url, lang=lang,
-                             processor=processor,
-                             timeout=timeout,
-                             username=username,
-                             password=password,
-                             loop=loop,
-                             validate_cert=validate_cert)
+    graph = GraphDatabase(url=url, lang=lang,
+                          processor=processor,
+                          timeout=timeout,
+                          username=username,
+                          password=password,
+                          loop=loop,
+                          validate_cert=validate_cert,
+                          future_class=future_class)
     future_class = future_class or concurrent.Future
     future = future_class()
-    future_conn = factory.connect(force_close=True)
+    future_conn = graph.connect(force_close=True)
 
     def on_connect(f):
 
@@ -54,12 +55,12 @@ def create_connection(url='ws://localhost:8182/', lang="gremlin-groovy",
                       loop=None, validate_cert=False, force_close=False,
                       future_class=None):
     loop = loop or IOLoop.current()
-    factory = GremlinFactory(url=url, lang=lang,
-                             processor=processor,
-                             timeout=timeout,
-                             username=username,
-                             password=password,
-                             loop=loop,
-                             validate_cert=validate_cert,
-                             future_class=future_class)
-    return factory.connect(force_close=force_close)
+    graph = GraphDatabase(url=url, lang=lang,
+                          processor=processor,
+                          timeout=timeout,
+                          username=username,
+                          password=password,
+                          loop=loop,
+                          validate_cert=validate_cert,
+                          future_class=future_class)
+    return graph.connect(force_close=force_close)

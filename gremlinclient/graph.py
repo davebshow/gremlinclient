@@ -6,12 +6,12 @@ from tornado.httpclient import HTTPRequest, HTTPError
 from tornado.ioloop import IOLoop
 from tornado.websocket import websocket_connect
 
-from gremlinclient.base import AbstractBaseFactory
+from gremlinclient.base import AbstractBaseGraph
 from gremlinclient.connection import GremlinConnection
-from gremlinclient.manager import _FactoryConnectionContextManager
+from gremlinclient.manager import _GraphConnectionContextManager
 
 
-class GremlinFactory(AbstractBaseFactory):
+class GraphDatabase(AbstractBaseGraph):
     """This class generates connections to the Gremlin Server"""
 
     def __init__(self, url='ws://localhost:8182/', lang="gremlin-groovy",
@@ -36,11 +36,13 @@ class GremlinFactory(AbstractBaseFactory):
             try:
                 conn = f.result()
             except socket.error:
-                future.set_exc_info(sys.exc_info())
+                future.set_exception(
+                    RuntimeError("Could not connect to server."))
             except socket.gaierror:
-                future.set_exc_info(sys.exc_info())
-            except HTTPError:
-                future.set_exc_info(sys.exc_info())
+                future.set_exception(
+                    RuntimeError("Could not connect to server."))
+            except HTTPError as e:
+                future.set_exception(e)
             else:
                 gc = GremlinConnection(conn, self._lang, self._processor,
                                        self._timeout, self._username,
@@ -53,4 +55,4 @@ class GremlinFactory(AbstractBaseFactory):
 
     def connection(self):
         conn = self.connect()
-        return _FactoryConnectionContextManager(conn)
+        return _GraphConnectionContextManager(conn)

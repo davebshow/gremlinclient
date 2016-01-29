@@ -3,7 +3,7 @@ import collections
 from tornado import concurrent
 from tornado.ioloop import IOLoop
 
-from gremlinclient.factory import GremlinFactory
+from gremlinclient.graph import GraphDatabase
 from gremlinclient.manager import _PoolConnectionContextManager
 
 
@@ -11,7 +11,7 @@ class GremlinPool(object):
 
     def __init__(self, url='ws://localhost:8182/', lang="gremlin-groovy",
                  processor="", timeout=None, username="", password="",
-                 factory=None, maxsize=256, loop=None, force_release=False,
+                 graph=None, maxsize=256, loop=None, force_release=False,
                  future_class=None):
         self._maxsize = maxsize
         self._pool = collections.deque()
@@ -23,12 +23,13 @@ class GremlinPool(object):
         self._force_release = force_release
         self._future_class = future_class or concurrent.Future
         # This may change depending on how other factories are passed
-        self._factory = factory or GremlinFactory(url=url,
-                                                  lang=lang,
-                                                  processor=processor,
-                                                  timeout=timeout,
-                                                  username=username,
-                                                  password=password)
+        self._graph = graph or GraphDatabase(url=url,
+                                             lang=lang,
+                                             processor=processor,
+                                             timeout=timeout,
+                                             username=username,
+                                             password=password,
+                                             future_class=future_class)
 
     def connection(self):
         conn = self.acquire()
@@ -47,8 +48,8 @@ class GremlinPool(object):
         return self._maxsize
 
     @property
-    def factory(self):
-        return self._factory
+    def graph(self):
+        return self._graph
 
     @property
     def pool(self):
@@ -56,7 +57,7 @@ class GremlinPool(object):
 
     @property
     def closed(self):
-        return self._closed or self._factory is None
+        return self._closed or self._graph is None
 
     def acquire(self):
         # maybe have max connection open time here
@@ -67,7 +68,7 @@ class GremlinPool(object):
             self.acquired.add(conn)
         elif self.size < self.maxsize:
             self._acquiring += 1
-            conn_future = self.factory.connect(
+            conn_future = self.graph.connect(
                 force_release=self._force_release, pool=self)
             def cb(f):
                 try:
@@ -106,5 +107,5 @@ class GremlinPool(object):
         while self._waiters:
             f = self._waiters.popleft()
             f.cancel()
-        self._factory = None
+        self._graph = None
         self._closed = True

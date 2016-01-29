@@ -3,7 +3,7 @@ from six import add_metaclass
 
 
 @add_metaclass(ABCMeta)
-class AbstractBaseFactory(object):
+class AbstractBaseGraph(object):
 
     @abstractmethod
     def connect(cls):

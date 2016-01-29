@@ -29,9 +29,10 @@ class GremlinConnection(AbstractBaseConnection):
     :param connector: A class that implements the method ``ws_connect``.
         Usually an instance of ``aiogremlin.connector.GremlinConnector``
     """
-    def __init__(self, conn, lang, processor, timeout, username, password,
-                 force_close=False, force_release=False, loop=None, pool=None,
-                 future_class=None):
+    def __init__(self, conn, lang="gremlin-groovy", processor="",
+                 timeout=None, username="", password="", loop=None,
+                 validate_cert=False, future_class=None, pool=None,
+                 force_close=False, force_release=False):
         self._conn = conn
         self._lang = lang
         self._processor = processor
@@ -67,7 +68,7 @@ class GremlinConnection(AbstractBaseConnection):
 
     @property
     def url(self):
-        """Getter/setter for database url used by the client"""
+        """Getter for database url used by the client"""
         return self._url
 
     @property
@@ -122,7 +123,8 @@ class GremlinConnection(AbstractBaseConnection):
                              force_close=self._force_close,
                              force_release=self._force_release,
                              username=self._username,
-                             password=self._password)
+                             password=self._password,
+                             future_class=self._future_class)
 
     @staticmethod
     def _prepare_message(gremlin, bindings, lang, rebindings, op, processor,

@@ -8,20 +8,20 @@ from tornado.websocket import WebSocketClientConnection
 from tornado.testing import gen_test, AsyncTestCase
 from tornado.ioloop import IOLoop
 from gremlinclient import (
-    submit, GremlinFactory, GremlinPool, GremlinStream, create_connection)
+    submit, GraphDatabase, GremlinPool, GremlinStream, create_connection)
 
 
 class TornadoFactoryConnectTest(AsyncTestCase):
 
     def setUp(self):
         super(TornadoFactoryConnectTest, self).setUp()
-        self.factory = GremlinFactory("wss://localhost:8182/",
+        self.graph = GraphDatabase("wss://localhost:8182/",
                                       username="stephen",
                                       password="password")
 
     @gen_test
     def test_connect(self):
-        connection = yield self.factory.connect()
+        connection = yield self.graph.connect()
         conn = connection.conn
         self.assertIsNotNone(conn.protocol)
         self.assertIsInstance(conn, WebSocketClientConnection)
@@ -29,25 +29,25 @@ class TornadoFactoryConnectTest(AsyncTestCase):
 
     @gen_test
     def test_bad_port_exception(self):
-        factory = GremlinFactory(url="ws://localhost:81/")
+        graph = GraphDatabase(url="ws://localhost:81/")
         with self.assertRaises(socket.error):
-            connection = yield factory.connect()
+            connection = yield graph.connect()
 
     @gen_test
     def test_wrong_protocol_exception(self):
-        factory = GremlinFactory(url="ws://localhost:8182/")
+        graph = GraphDatabase(url="ws://localhost:8182/")
         with self.assertRaises(tornado.httpclient.HTTPError):
-            connection = yield factory.connect()
+            connection = yield graph.connect()
 
     @gen_test
     def test_bad_host_exception(self):
-        factory = GremlinFactory(url="wss://locaost:8182/")
+        graph = GraphDatabase(url="wss://locaost:8182/")
         with self.assertRaises(socket.gaierror):
-            connection = yield factory.connect()
+            connection = yield graph.connect()
 
     @gen_test
     def test_submit(self):
-        connection = yield self.factory.connect()
+        connection = yield self.graph.connect()
         resp = connection.submit("1 + 1")
         while True:
             msg = yield resp.read()
@@ -58,28 +58,36 @@ class TornadoFactoryConnectTest(AsyncTestCase):
         connection.conn.close()
 
     @gen_test
-    def test_read_on_closed(self):
-        connection = yield self.factory.connect()
+    def test_read_one_on_closed(self):
+        connection = yield self.graph.connect()
         resp = connection.submit("1 + 1")
         connection.close()
         with self.assertRaises(RuntimeError):
             msg = yield resp.read()
 
     @gen_test
+    def test_null_read_on_closed(self):
+        connection = yield self.graph.connect()
+        # build connection
+        connection.close()
+        stream = GremlinStream(connection)
+        with self.assertRaises(RuntimeError):
+            msg = yield stream.read()
+
+    @gen_test
     def test_creditials_error(self):
-        factory = GremlinFactory("wss://localhost:8182/",
-                                 username="stephen",
-                                 password="passwor")
-        connection = yield factory.connect()
+        graph = GraphDatabase("wss://localhost:8182/",
+                                username="stephen",
+                                password="passwor")
+        connection = yield graph.connect()
         resp = connection.submit("1 + 1")
         with self.assertRaises(RuntimeError):
             msg = yield resp.read()
-
         connection.conn.close()
 
     @gen_test
     def test_force_close(self):
-        connection = yield self.factory.connect(force_close=True)
+        connection = yield self.graph.connect(force_close=True)
         resp = connection.submit("1 + 1")
         while True:
             msg = yield resp.read()
@@ -236,38 +244,13 @@ class TornadoCtxtMngrTest(AsyncTestCase):
         pool.close()
 
     @gen_test
-    def test_factory_manager(self):
-        factory = GremlinFactory(url="wss://localhost:8182/",
-                                 username="stephen",
-                                 password="password")
-        with factory.connection() as conn:
+    def test_graph_manager(self):
+        graph = GraphDatabase(url="wss://localhost:8182/",
+                                username="stephen",
+                                password="password")
+        with graph.connection() as conn:
             conn = yield conn
             self.assertFalse(conn.closed)
-
-    # @gen_test
-    # def test_pool_callback(self):
-        # This is mogwai style, failing though because the context
-        # manager wants to pass the result of the futre_conn back to
-        # the pool, throws error because future isn't complete.
-        # Need to rethink this.
-        # pool = GremlinPool(maxsize=2)
-        #
-        # def execute(script):
-        #     future = Future()
-        #     with pool.connection() as future_conn:
-        #
-        #         def cb(f):
-        #             conn = f.result()
-        #             stream = conn.submit(script)
-        #             future.set_result(stream)
-        #
-        #         future_conn.add_done_callback(cb)
-        #     return future
-        # result = yield execute("1 + 1")
-        # self.assertIsInstance(result, GremlinStream)
-        # resp = yield result.read()
-        # self.assertEqual(resp.data[0], 2)
-
 
 class TornadoCallbackStyleTest(AsyncTestCase):
 
@@ -280,10 +263,10 @@ class TornadoCallbackStyleTest(AsyncTestCase):
 
         def execute(script):
             future = Future()
-            factory = GremlinFactory(url="wss://localhost:8182/",
-                                     username="stephen",
-                                     password="password")
-            future_conn = factory.connect()
+            graph = GraphDatabase(url="wss://localhost:8182/",
+                                    username="stephen",
+                                    password="password")
+            future_conn = graph.connect()
 
             def cb(f):
                 conn = f.result()
@@ -326,8 +309,8 @@ class TornadoAPITests(AsyncTestCase):
     def test_script_exception(self):
         with self.assertRaises(RuntimeError):
             stream = yield submit("throw new Exception('error')",
-                         url="wss://localhost:8182/",
-                         password="password", username="stephen")
+                                  url="wss://localhost:8182/",
+                                  password="password", username="stephen")
             yield stream.read()
 
 

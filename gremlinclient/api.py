@@ -16,7 +16,6 @@ def submit(gremlin,
            loop=None,
            username="",
            password="",
-           handler=None,
            validate_cert=False,
            future_class=None):
 
@@ -42,7 +41,7 @@ def submit(gremlin,
             stream = conn.submit(gremlin, bindings=bindings, lang=lang,
                                  rebindings=rebindings, op=op,
                                  processor=processor, session=session,
-                                 timeout=timeout, handler=handler)
+                                 timeout=timeout)
             future.set_result(stream)
 
     future_conn.add_done_callback(on_connect)

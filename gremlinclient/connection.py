@@ -82,7 +82,7 @@ class GremlinConnection(AbstractBaseConnection):
 
     def submit(self, gremlin, bindings=None, lang=None, rebindings=None,
                op="eval", processor=None, session=None,
-               timeout=None, mime_type="application/json", handler=None):
+               timeout=None, mime_type="application/json"):
         """
         Submit a script to the Gremlin Server.
         :param str gremlin: Gremlin script to submit to server.
@@ -119,7 +119,6 @@ class GremlinConnection(AbstractBaseConnection):
         self.conn.write_message(message, binary=True)
 
         return GremlinStream(self,
-                             handler=handler,
                              force_close=self._force_close,
                              force_release=self._force_release,
                              username=self._username,
@@ -180,20 +179,16 @@ class GremlinConnection(AbstractBaseConnection):
 class GremlinStream(object):
 
     def __init__(self, conn, session=None, loop=None, username="",
-                 password="", handler=None, force_close=False,
+                 password="", force_close=False,
                  force_release=False, future_class=None):
         self._conn = conn
         self._closed = False
         self._username = username
         self._password = password
-        self._handler = handler
         self._force_close = force_close
         self._force_release = force_release
         self._loop = loop or IOLoop.current()
         self._future_class = future_class or concurrent.Future
-
-    def add_handler(self, func):
-        self._handler = func
 
     def read(self):
         future = self._future_class()
@@ -201,8 +196,11 @@ class GremlinStream(object):
             future.set_result(None)
         else:
             def parser(f):
+                terminate = True
                 try:
+                    # move this part to the response object
                     result = f.result()
+                    # result can be none if conn is closed...test that
                 except Exception as e:
                     future.set_exception(e)
                 else:
@@ -211,19 +209,14 @@ class GremlinStream(object):
                                       message["result"]["data"],
                                       message["status"]["message"],
                                       message["result"]["meta"])
-                    if self._handler is None:
-                        self._handler = lambda x: x
+
                     if message.status_code == 200:
-                        future.set_result(self._handler(message))
-                        if self._force_close:
-                            self._conn.close()
-                        if self._force_release:
-                            self._conn.release()
-                        self._closed = True
-                        self._conn = None
+                        future.set_result(message)
                     elif message.status_code == 206:
-                        future.set_result(self._handler(message))
+                        terminate = False
+                        future.set_result(message)
                     elif message.status_code == 407:
+                        terminate = False
                         self._conn._authenticate(
                             self._username, self._password)
                         future_read = self.read()
@@ -236,23 +229,20 @@ class GremlinStream(object):
                                 future.set_result(result)
                         future_read.add_done_callback(cb)
                     elif message.status_code == 204:
-                        future.set_result(self._handler(message))
-                        if self._force_close:
-                            self._conn.close()
-                        if self._force_release:
-                            self._conn.release()
-                        self._closed = True
-                        self._conn = None
+                        future.set_result(message)
                     else:
                         future.set_exception(
                             RuntimeError("{0} {1}".format(
                                 message.status_code, message.message)))
-                        if self._force_close:
+                finally:
+                    if terminate:
+                        if  self._force_close:
                             self._conn.close()
                         if self._force_release:
                             self._conn.release()
                         self._closed = True
                         self._conn = None
+
 
             future_resp = self._conn.conn.read_message(callback=parser)
         return future

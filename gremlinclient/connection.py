@@ -3,7 +3,7 @@ import collections
 import json
 import uuid
 
-from tornado.concurrent import Future
+from tornado import concurrent
 from tornado.ioloop import IOLoop
 
 from gremlinclient.base import AbstractBaseConnection
@@ -30,7 +30,8 @@ class GremlinConnection(AbstractBaseConnection):
         Usually an instance of ``aiogremlin.connector.GremlinConnector``
     """
     def __init__(self, conn, lang, processor, timeout, username, password,
-                 force_close=False, force_release=False, loop=None, pool=None):
+                 force_close=False, force_release=False, loop=None, pool=None,
+                 future_type=None):
         self._conn = conn
         self._lang = lang
         self._processor = processor
@@ -43,6 +44,7 @@ class GremlinConnection(AbstractBaseConnection):
         self._force_release = force_release
         self._loop = loop or IOLoop.current()
         self._pool = pool
+        self._future = future_type or concurrent.Future
 
     def release(self):
         if self._pool:
@@ -76,6 +78,7 @@ class GremlinConnection(AbstractBaseConnection):
     def close(self):
         self._conn.close()
         self._closed = True
+        self._pool = None
 
     def submit(self, gremlin, bindings=None, lang=None, rebindings=None,
                op="eval", processor=None, session=None,
@@ -178,7 +181,7 @@ class GremlinStream(object):
 
     def __init__(self, conn, session=None, loop=None, username="",
                  password="", handler=None, force_close=False,
-                 force_release=False):
+                 force_release=False, future_type=None):
         self._conn = conn
         self._closed = False
         self._username = username
@@ -187,12 +190,13 @@ class GremlinStream(object):
         self._force_close = force_close
         self._force_release = force_release
         self._loop = loop or IOLoop.current()
+        self._future = future_type or concurrent.Future
 
     def add_handler(self, func):
         self._handler = func
 
     def read(self):
-        future = Future()
+        future = self._future()
         if self._closed:
             future.set_result(None)
         else:
@@ -230,7 +234,7 @@ class GremlinStream(object):
                                 future.set_exception(e)
                             else:
                                 future.set_result(result)
-                        self._loop.add_future(future_read, cb)
+                        future_read.add_done_callback(cb)
                     elif message.status_code == 204:
                         future.set_result(self._handler(message))
                         if self._force_close:

@@ -68,11 +68,16 @@ class GremlinPool(object):
             conn_future = self.factory.connect(
                 force_release=self._force_release, pool=self)
             def cb(f):
-                conn = f.result()
-                self._acquiring -= 1
-                self._acquired.add(conn)
-                future.set_result(conn)
-            self._loop.add_future(conn_future, cb)
+                try:
+                    conn = f.result()
+                except Exception as e:
+                    future.set_exception(e)
+                else:
+                    self._acquired.add(conn)
+                    future.set_result(conn)
+                finally:
+                    self._acquiring -= 1
+            conn_future.add_done_callback(cb)
         else:
             self._waiters.append(future)
         return future

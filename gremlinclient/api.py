@@ -1,4 +1,4 @@
-from tornado.concurrent import Future
+from tornado import concurrent
 from tornado.ioloop import IOLoop
 
 from gremlinclient.factory import GremlinFactory
@@ -17,7 +17,8 @@ def submit(gremlin,
            username="",
            password="",
            handler=None,
-           validate_cert=False):
+           validate_cert=False,
+           future_type=None):
 
     loop = loop or IOLoop.current()
     factory = GremlinFactory(url=url, lang=lang,
@@ -27,7 +28,8 @@ def submit(gremlin,
                              password=password,
                              loop=loop,
                              validate_cert=validate_cert)
-    future = Future()
+    future_type = future_type or concurrent.Future
+    future = future_type()
     future_conn = factory.connect(force_close=True)
 
     def on_connect(f):
@@ -43,14 +45,15 @@ def submit(gremlin,
                                  timeout=timeout, handler=handler)
             future.set_result(stream)
 
-    loop.add_future(future_conn, on_connect)
+    future_conn.add_done_callback(on_connect)
 
     return future
 
 
 def create_connection(url='ws://localhost:8182/', lang="gremlin-groovy",
                       processor="", timeout=None, username="", password="",
-                      loop=None, validate_cert=False, force_close=False):
+                      loop=None, validate_cert=False, force_close=False,
+                      future_type=None):
     loop = loop or IOLoop.current()
     factory = GremlinFactory(url=url, lang=lang,
                              processor=processor,
@@ -58,5 +61,6 @@ def create_connection(url='ws://localhost:8182/', lang="gremlin-groovy",
                              username=username,
                              password=password,
                              loop=loop,
-                             validate_cert=validate_cert)
+                             validate_cert=validate_cert,
+                             future_type=future_type)
     return factory.connect(force_close=force_close)

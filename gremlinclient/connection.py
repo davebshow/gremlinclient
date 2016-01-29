@@ -194,11 +194,12 @@ class GremlinStream(object):
         future = self._future_class()
         if self._closed:
             future.set_result(None)
+        elif self._conn.closed:
+            future.set_exception(RuntimeError("Connection has been closed"))
         else:
             def parser(f):
                 terminate = True
                 try:
-                    # move this part to the response object
                     result = f.result()
                     # result can be none if conn is closed...test that
                 except Exception as e:
@@ -217,17 +218,21 @@ class GremlinStream(object):
                         future.set_result(message)
                     elif message.status_code == 407:
                         terminate = False
-                        self._conn._authenticate(
-                            self._username, self._password)
-                        future_read = self.read()
-                        def cb(f):
-                            try:
-                                result = f.result()
-                            except Exception as e:
-                                future.set_exception(e)
-                            else:
-                                future.set_result(result)
-                        future_read.add_done_callback(cb)
+                        try:
+                            self._conn._authenticate(
+                                self._username, self._password)
+                        except Exception as e:
+                            future.set_exception(e)
+                        else:
+                            future_read = self.read()
+                            def cb(f):
+                                try:
+                                    result = f.result()
+                                except Exception as e:
+                                    future.set_exception(e)
+                                else:
+                                    future.set_result(result)
+                            future_read.add_done_callback(cb)
                     elif message.status_code == 204:
                         future.set_result(message)
                     else:

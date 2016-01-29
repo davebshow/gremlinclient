@@ -58,6 +58,14 @@ class TornadoFactoryConnectTest(AsyncTestCase):
         connection.conn.close()
 
     @gen_test
+    def test_read_on_closed(self):
+        connection = yield self.factory.connect()
+        resp = connection.submit("1 + 1")
+        connection.close()
+        with self.assertRaises(RuntimeError):
+            msg = yield resp.read()
+
+    @gen_test
     def test_creditials_error(self):
         factory = GremlinFactory("wss://localhost:8182/",
                                  username="stephen",

@@ -9,19 +9,19 @@ from gremlinclient import (
     submit, GraphDatabase, GremlinPool, GremlinStream, create_connection)
 
 
+AsyncIOMainLoop().install()
+
+
 class AsyncioFactoryConnectTest(unittest.TestCase):
 
     def setUp(self):
-        try:
-            AsyncIOMainLoop().install()
-        except AssertionError:
-            pass
         self.loop = asyncio.get_event_loop()
         self.graph = GraphDatabase("wss://localhost:8182/",
                                    username="stephen",
                                    password="password",
                                    loop=self.loop,
                                    future_class=Future)
+
 
     def test_connect(self):
 
@@ -144,13 +144,10 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
 
         self.loop.run_until_complete(go())
 
+
 class AsyncioPoolTest(unittest.TestCase):
 
     def setUp(self):
-        try:
-            AsyncIOMainLoop().install()
-        except AssertionError:
-            pass
         self.loop = asyncio.get_event_loop()
 
     def test_acquire(self):
@@ -330,10 +327,6 @@ class AsyncioPoolTest(unittest.TestCase):
 class AsyncioCtxtMngrTest(unittest.TestCase):
 
     def setUp(self):
-        try:
-            AsyncIOMainLoop().install()
-        except AssertionError:
-            pass
         self.loop = asyncio.get_event_loop()
 
     def test_pool_manager(self):
@@ -369,10 +362,6 @@ class AsyncioCtxtMngrTest(unittest.TestCase):
 class AsyncioCallbackStyleTest(unittest.TestCase):
 
     def setUp(self):
-        try:
-            AsyncIOMainLoop().install()
-        except AssertionError:
-            pass
         self.loop = asyncio.get_event_loop()
 
     def test_data_flow(self):
@@ -408,10 +397,6 @@ class AsyncioCallbackStyleTest(unittest.TestCase):
 class AsyncioAPITests(unittest.TestCase):
 
     def setUp(self):
-        try:
-            AsyncIOMainLoop().install()
-        except AssertionError:
-            pass
         self.loop = asyncio.get_event_loop()
 
     def test_create_connection(self):

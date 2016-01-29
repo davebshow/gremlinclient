@@ -1,4 +1,3 @@
-import socket
 import unittest
 from datetime import timedelta
 import tornado
@@ -30,7 +29,7 @@ class TornadoFactoryConnectTest(AsyncTestCase):
     @gen_test
     def test_bad_port_exception(self):
         graph = GraphDatabase(url="ws://localhost:81/")
-        with self.assertRaises(socket.error):
+        with self.assertRaises(RuntimeError):
             connection = yield graph.connect()
 
     @gen_test
@@ -42,7 +41,7 @@ class TornadoFactoryConnectTest(AsyncTestCase):
     @gen_test
     def test_bad_host_exception(self):
         graph = GraphDatabase(url="wss://locaost:8182/")
-        with self.assertRaises(socket.gaierror):
+        with self.assertRaises(RuntimeError):
             connection = yield graph.connect()
 
     @gen_test

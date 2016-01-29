@@ -1,9 +1,7 @@
 import unittest
 import asyncio
 from asyncio import Future
-import socket
 import unittest
-from datetime import timedelta
 import tornado
 from tornado.websocket import WebSocketClientConnection
 from tornado.platform.asyncio import AsyncIOMainLoop

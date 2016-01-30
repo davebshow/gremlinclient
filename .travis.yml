@@ -1,6 +1,12 @@
 sudo: required
+dist: trusty
 
 language: python
+python:
+    - 2.7
+    - 3.3
+    - 3.4
+    - 3.5
 
 services:
   - docker
@@ -25,10 +31,3 @@ script:
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; python setup.py test -s test.test_tornado; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; python setup.py test -s test.test_tornado; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; python setup.py test -s test.test_asyncio; fi
-
-matrix:
-  include:
-    - python: '2.7'
-    - python: '3.3'
-    - python: '3.4'
-    - python: '3.5'

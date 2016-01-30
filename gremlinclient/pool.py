@@ -6,7 +6,6 @@ from tornado import concurrent
 from tornado.ioloop import IOLoop
 
 from gremlinclient.graph import GraphDatabase
-from gremlinclient.manager import _PoolConnectionContextManager
 
 
 PY_33 = sys.version_info >= (3, 3)
@@ -167,13 +166,6 @@ class GremlinPool(object):
 
     if PY_35:
         exec(textwrap.dedent("""
-        def __await__(self):
-            '''
-            with await pool
-            '''
-            conn = yield from self.acquire()
-            return _ConnectionContextManager(self, conn)
-
         def connection(self):
             '''Return async context manager for working with connection.
 

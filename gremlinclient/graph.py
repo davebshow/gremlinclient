@@ -9,7 +9,6 @@ from tornado.websocket import websocket_connect
 
 from gremlinclient.base import AbstractBaseGraph
 from gremlinclient.connection import GremlinConnection
-from gremlinclient.manager import _GraphConnectionContextManager
 
 
 PY_33 = sys.version_info >= (3, 3)

@@ -1,0 +1,34 @@
+sudo: false
+
+language: python
+
+services:
+  - docker
+
+before_install:
+  - docker pull itzg/elasticsearch
+  - docker pull poklet/cassandra
+  - docker pull elubow/titan-gremlin
+
+install:
+  - pip install tornado
+  - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then pip install trollius; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == '3.3' ]]; then pip install asyncio; fi
+  - docker run -d --name es1 itzg/elasticsearch
+  - docker run -d --name cas1 poklet/cassandra
+  - docker run -d -p 8182:8182 -p 8183:8183 -p 8184:8184 --name titan --link es1:elasticsearch --link cas1:cassandra elubow/titan-gremlin
+
+before_script:
+  - sleep 10
+
+script:
+  - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; python setup.py test -s test.test_tornado; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; python setup.py test -s test.test_tornado; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; python setup.py test -s test.test_asyncio; fi
+
+matrix:
+  include:
+    - python: '2.7'
+    - python: '3.3'
+    - python: '3.4'
+    - python: '3.5'

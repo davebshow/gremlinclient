@@ -1,10 +1,16 @@
 import collections
+import sys
+import textwrap
 
 from tornado import concurrent
 from tornado.ioloop import IOLoop
 
 from gremlinclient.graph import GraphDatabase
 from gremlinclient.manager import _PoolConnectionContextManager
+
+
+PY_33 = sys.version_info >= (3, 3)
+PY_35 = sys.version_info >= (3, 5)
 
 
 class GremlinPool(object):
@@ -30,10 +36,6 @@ class GremlinPool(object):
                                              username=username,
                                              password=password,
                                              future_class=future_class)
-
-    def connection(self):
-        conn = self.acquire()
-        return _PoolConnectionContextManager(self, conn)
 
     @property
     def freesize(self):
@@ -109,3 +111,119 @@ class GremlinPool(object):
             f.cancel()
         self._graph = None
         self._closed = True
+
+# The follwoing is inspired by:
+# https://github.com/aio-libs/aioredis/blob/master/aioredis/pool.py
+# and
+# http://www.tornadoweb.org/en/stable/_modules/tornado/concurrent.html#Future
+    def __enter__(self):
+        raise RuntimeError(
+                "context manager should use some variation of yield/yield from")
+
+    def __exit__(self, *args):
+        pass
+
+    if not PY_33:
+        def __await__(self):
+            future = self._future_class()
+            future_conn = self.acquire()
+
+            def on_connect(f):
+                try:
+                    conn = f.result()
+                except Exception as e:
+                    future.set_exception(e)
+                else:
+                    future.set_result(
+                        _PoolConnectionContextManager(self, conn))
+
+            future_conn.add_done_callback(on_connect)
+            result = yield future
+            # StopIteration doesn't take args before py33,
+            # but Cython recognizes the args tuple.
+            e = StopIteration()
+            e.args = (result,)
+            raise e
+
+    if PY_33:
+        exec(textwrap.dedent("""
+        def __await__(self):
+            future = self._future_class()
+            future_conn = self.acquire()
+
+            def on_connect(f):
+                try:
+                    conn = f.result()
+                except Exception as e:
+                    future.set_exception(e)
+                else:
+                    future.set_result(
+                        _PoolConnectionContextManager(self, conn))
+
+            future_conn.add_done_callback(on_connect)
+            return (yield future)"""))
+
+
+
+    if PY_35:
+        exec(textwrap.dedent("""
+        def __await__(self):
+            '''
+            with await pool
+            '''
+            conn = yield from self.acquire()
+            return _ConnectionContextManager(self, conn)
+
+        def connection(self):
+            '''Return async context manager for working with connection.
+
+            async with pool.get() as conn:
+            '''
+            return _AsyncConnectionContextManager(self)"""))
+
+
+class _PoolConnectionContextManager(object):
+
+    __slots__ = ('_pool', '_conn')
+
+    def __init__(self, pool, conn):
+        self._pool = pool
+        self._conn = conn
+
+    def __enter__(self):
+        return self._conn
+
+    def __exit__(self, exc_type, exc_value, tb):
+        try:
+            self._pool.release(self._conn)
+        finally:
+            self._pool = None
+            self._conn = None
+
+
+# The follwoing is taken from:
+# https://github.com/aio-libs/aioredis/blob/master/aioredis/pool.py
+# will have to test both styles
+if PY_35:
+    exec(textwrap.dedent("""
+    import asyncio
+    class _AsyncPoolConnectionContextManager:
+
+        __slots__ = ('_pool', '_conn')
+
+        def __init__(self, pool):
+            self._pool = pool
+            self._conn = None
+
+        @asyncio.coroutine
+        def __aenter__(self):
+            self._conn = yield from self._pool.acquire()
+            return self._conn
+
+        @asyncio.coroutine
+        def __aexit__(self, exc_type, exc_value, tb):
+            try:
+                self._pool.release(self._conn)
+            finally:
+                self._pool = None
+                self._conn = None"""))

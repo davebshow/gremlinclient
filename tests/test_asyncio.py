@@ -37,7 +37,7 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
 
 
     def test_bad_port_exception(self):
-        graph = GraphDatabase(url="ws://localhost:81/", loop=self.loop,
+        graph = GraphDatabase(url="wss://localhost:81/", loop=self.loop,
                               future_class=Future)
 
         @asyncio.coroutine
@@ -339,8 +339,7 @@ class AsyncioCtxtMngrTest(unittest.TestCase):
 
         @asyncio.coroutine
         def go():
-            with pool.connection() as conn:
-                conn = yield from conn
+            with (yield from pool) as conn:
                 self.assertFalse(conn.closed)
             self.assertEqual(len(pool.pool), 1)
             self.assertEqual(len(pool._acquired), 0)
@@ -355,8 +354,7 @@ class AsyncioCtxtMngrTest(unittest.TestCase):
 
         @asyncio.coroutine
         def go():
-            with graph.connection() as conn:
-                conn = yield from conn
+            with (yield from graph) as conn:
                 self.assertFalse(conn.closed)
 
 class AsyncioCallbackStyleTest(unittest.TestCase):

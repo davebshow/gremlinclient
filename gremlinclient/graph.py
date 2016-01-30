@@ -1,5 +1,6 @@
 import socket
 import sys
+import textwrap
 
 from tornado import concurrent
 from tornado.httpclient import HTTPRequest, HTTPError
@@ -9,6 +10,10 @@ from tornado.websocket import websocket_connect
 from gremlinclient.base import AbstractBaseGraph
 from gremlinclient.connection import GremlinConnection
 from gremlinclient.manager import _GraphConnectionContextManager
+
+
+PY_33 = sys.version_info >= (3, 3)
+PY_35 = sys.version_info >= (3, 5)
 
 
 class GraphDatabase(AbstractBaseGraph):
@@ -53,6 +58,103 @@ class GraphDatabase(AbstractBaseGraph):
         future_conn.add_done_callback(get_conn)
         return future
 
-    def connection(self):
-        conn = self.connect()
-        return _GraphConnectionContextManager(conn)
+# The follwoing is inspired by:
+# https://github.com/aio-libs/aioredis/blob/master/aioredis/pool.py
+# and
+# http://www.tornadoweb.org/en/stable/_modules/tornado/concurrent.html#Future
+    def __enter__(self):
+        raise RuntimeError(
+            "context manager should use some variation of yield/yield from")
+
+    def __exit__(self, *args):
+        pass
+
+    if not PY_33:
+        def __await__(self):
+            future = self._future_class()
+            future_conn = self.connect()
+
+            def on_connect(f):
+                try:
+                    conn = f.result()
+                except Exception as e:
+                    future.set_exception(e)
+                else:
+                    future.set_result(
+                        _GraphConnectionContextManager(conn))
+
+            future_conn.add_done_callback(on_connect)
+            result = yield future
+            # StopIteration doesn't take args before py33,
+            # but Cython recognizes the args tuple.
+            e = StopIteration()
+            e.args = (result,)
+            raise e
+
+    if PY_33:
+        exec(textwrap.dedent("""
+        def __await__(self):
+            future = self._future_class()
+            future_conn = self.connect()
+
+            def on_connect(f):
+                try:
+                    conn = f.result()
+                except Exception as e:
+                    future.set_exception(e)
+                else:
+                    future.set_result(
+                        _GraphConnectionContextManager(conn))
+
+            future_conn.add_done_callback(on_connect)
+            return (yield future)"""))
+
+    if PY_35:
+        exec(textwrap.dedent("""
+
+        def connection(self):
+            '''Return async context manager for working with connection.
+
+            async with pool.get() as conn:
+            '''
+            return _AsyncConnectionContextManager(self)"""))
+
+
+class _GraphConnectionContextManager(object):
+
+    __slots__ = ('_conn')
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def __enter__(self):
+        return self._conn
+
+    def __exit__(self, exc_type, exc_value, tb):
+        try:
+            self._conn.close()
+        finally:
+            self._conn = None
+
+
+if PY_35:
+    # Need to implement/test
+    exec(textwrap.dedent("""
+    import asyncio
+    class _AsyncGraphConnectionContextManager:
+
+        __slots__ = ('_conn')
+
+        def __init__(self, conn):
+            self._conn = None
+
+        @asyncio.coroutine
+        def __aenter__(self):
+            return self._conn
+
+        @asyncio.coroutine
+        def __aexit__(self, exc_type, exc_value, tb):
+            try:
+                self._conn.close()
+            finally:
+                self._conn = None"""))

@@ -28,7 +28,7 @@ class TornadoFactoryConnectTest(AsyncTestCase):
 
     @gen_test
     def test_bad_port_exception(self):
-        graph = GraphDatabase(url="ws://localhost:81/")
+        graph = GraphDatabase(url="wss://localhost:81/")
         with self.assertRaises(RuntimeError):
             connection = yield graph.connect()
 
@@ -235,8 +235,7 @@ class TornadoCtxtMngrTest(AsyncTestCase):
                            maxsize=2,
                            username="stephen",
                            password="password")
-        with pool.connection() as conn:
-            conn = yield conn
+        with (yield pool) as conn:
             self.assertFalse(conn.closed)
         self.assertEqual(len(pool.pool), 1)
         self.assertEqual(len(pool._acquired), 0)
@@ -247,8 +246,7 @@ class TornadoCtxtMngrTest(AsyncTestCase):
         graph = GraphDatabase(url="wss://localhost:8182/",
                                 username="stephen",
                                 password="password")
-        with graph.connection() as conn:
-            conn = yield conn
+        with (yield graph) as conn:
             self.assertFalse(conn.closed)
 
 class TornadoCallbackStyleTest(AsyncTestCase):

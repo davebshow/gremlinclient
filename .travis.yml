@@ -28,6 +28,6 @@ before_script:
   - sleep 10
 
 script:
-  - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; python setup.py test -s test.test_tornado; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; python setup.py test -s test.test_tornado; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; python setup.py test -s test.test_asyncio; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then python setup.py test -s tests.test_tornado; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then python setup.py test -s tests.test_tornado; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then python setup.py test -s tests.test_asyncio; fi

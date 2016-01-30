@@ -8,7 +8,7 @@ from tornado.ioloop import IOLoop
 from tornado.websocket import websocket_connect
 
 from gremlinclient.base import AbstractBaseGraph
-from gremlinclient.connection import GremlinConnection
+from gremlinclient.connection import Connection
 
 
 PY_33 = sys.version_info >= (3, 3)
@@ -48,11 +48,11 @@ class GraphDatabase(AbstractBaseGraph):
             except HTTPError as e:
                 future.set_exception(e)
             else:
-                gc = GremlinConnection(conn, self._lang, self._processor,
-                                       self._timeout, self._username,
-                                       self._password, force_close=force_close,
-                                       force_release=force_release, pool=pool,
-                                       future_class=self._future_class)
+                gc = Connection(conn, self._lang, self._processor,
+                                self._timeout, self._username,
+                                self._password, force_close=force_close,
+                                force_release=force_release, pool=pool,
+                                future_class=self._future_class)
                 future.set_result(gc)
         future_conn.add_done_callback(get_conn)
         return future

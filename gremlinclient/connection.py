@@ -14,7 +14,7 @@ Message = collections.namedtuple(
     ["status_code", "data", "message", "metadata"])
 
 
-class GremlinConnection(AbstractBaseConnection):
+class Connection(AbstractBaseConnection):
     """This class encapsulates a connection to the Gremlin Server using the
     Tornado websocket client implementation.
     :param str url: url for Gremlin Server (optional). 'http://localhost:8182/'
@@ -100,7 +100,7 @@ class GremlinConnection(AbstractBaseConnection):
         :param loop: :ref:`event loop<asyncio-event-loop>` If param is ``None``
             `asyncio.get_event_loop` is used for getting default event loop
             (optional)
-        :returns: :py:class:`gremlinclient.client.GremlinStream` object
+        :returns: :py:class:`gremlinclient.client.Stream` object
         """
         lang = lang or self.lang
         processor = processor or self.processor
@@ -119,7 +119,7 @@ class GremlinConnection(AbstractBaseConnection):
         message = self._set_message_header(message, mime_type)
         self.conn.write_message(message, binary=True)
 
-        return GremlinStream(self,
+        return Stream(self,
                              force_close=self._force_close,
                              force_release=self._force_release,
                              username=self._username,
@@ -178,7 +178,7 @@ class GremlinConnection(AbstractBaseConnection):
         return self.conn.write_message(message, binary=True)
 
 
-class GremlinStream(object):
+class Stream(object):
 
     def __init__(self, conn, session=None, loop=None, username="",
                  password="", force_close=False,

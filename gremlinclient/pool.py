@@ -12,7 +12,7 @@ PY_33 = sys.version_info >= (3, 3)
 PY_35 = sys.version_info >= (3, 5)
 
 
-class GremlinPool(object):
+class Pool(object):
 
     def __init__(self, url='ws://localhost:8182/', lang="gremlin-groovy",
                  processor="", timeout=None, username="", password="",

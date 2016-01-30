@@ -6,7 +6,7 @@ import tornado
 from tornado.websocket import WebSocketClientConnection
 from tornado.platform.asyncio import AsyncIOMainLoop
 from gremlinclient import (
-    submit, GraphDatabase, GremlinPool, GremlinStream, create_connection)
+    submit, GraphDatabase, Pool, Stream, create_connection)
 
 
 AsyncIOMainLoop().install()
@@ -105,7 +105,7 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
             connection = yield from self.graph.connect()
             # build connection
             connection.close()
-            stream = GremlinStream(connection, future_class=Future)
+            stream = Stream(connection, future_class=Future)
             with self.assertRaises(RuntimeError):
                 msg = yield from stream.read()
 
@@ -151,12 +151,12 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop = asyncio.get_event_loop()
 
     def test_acquire(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password",
-                           loop=self.loop,
-                           future_class=Future)
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    loop=self.loop,
+                    future_class=Future)
 
         @asyncio.coroutine
         def go():
@@ -179,12 +179,12 @@ class AsyncioPoolTest(unittest.TestCase):
 
 
     def test_acquire_submit(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password",
-                           loop=self.loop,
-                           future_class=Future)
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    loop=self.loop,
+                    future_class=Future)
 
         @asyncio.coroutine
         def go():
@@ -201,12 +201,12 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
     def test_maxsize(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password",
-                           loop=self.loop,
-                           future_class=Future)
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    loop=self.loop,
+                    future_class=Future)
 
         @asyncio.coroutine
         def go():
@@ -222,12 +222,12 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
     def test_release(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password",
-                           loop=self.loop,
-                           future_class=Future)
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    loop=self.loop,
+                    future_class=Future)
 
         @asyncio.coroutine
         def go():
@@ -241,13 +241,13 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
     def test_self_release(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password",
-                           force_release=True,
-                           future_class=Future,
-                           loop=self.loop)
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    force_release=True,
+                    future_class=Future,
+                    loop=self.loop)
 
         @asyncio.coroutine
         def go():
@@ -262,11 +262,11 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
     def test_maxsize_release(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password",
-                           future_class=Future)
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    future_class=Future)
 
         @asyncio.coroutine
         def go():
@@ -287,11 +287,11 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
     def test_close(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password",
-                           future_class=Future)
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    future_class=Future)
 
         @asyncio.coroutine
         def go():
@@ -306,11 +306,11 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
     def test_cancelled(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password",
-                           future_class=Future)
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    future_class=Future)
 
         @asyncio.coroutine
         def go():
@@ -330,12 +330,12 @@ class AsyncioCtxtMngrTest(unittest.TestCase):
         self.loop = asyncio.get_event_loop()
 
     def test_pool_manager(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password",
-                           loop=self.loop,
-                           future_class=Future)
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    loop=self.loop,
+                    future_class=Future)
 
         @asyncio.coroutine
         def go():
@@ -385,7 +385,7 @@ class AsyncioCallbackStyleTest(unittest.TestCase):
         @asyncio.coroutine
         def go():
             result = yield from execute("1 + 1")
-            self.assertIsInstance(result, GremlinStream)
+            self.assertIsInstance(result, Stream)
             resp = yield from result.read()
             self.assertEqual(resp.data[0], 2)
 

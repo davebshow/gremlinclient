@@ -7,7 +7,7 @@ from tornado.websocket import WebSocketClientConnection
 from tornado.testing import gen_test, AsyncTestCase
 from tornado.ioloop import IOLoop
 from gremlinclient import (
-    submit, GraphDatabase, GremlinPool, GremlinStream, create_connection)
+    submit, GraphDatabase, Pool, Stream, create_connection)
 
 
 class TornadoFactoryConnectTest(AsyncTestCase):
@@ -69,7 +69,7 @@ class TornadoFactoryConnectTest(AsyncTestCase):
         connection = yield self.graph.connect()
         # build connection
         connection.close()
-        stream = GremlinStream(connection)
+        stream = Stream(connection)
         with self.assertRaises(RuntimeError):
             msg = yield stream.read()
 
@@ -100,10 +100,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_acquire(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password")
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password")
         connection = yield pool.acquire()
         conn = connection.conn
         self.assertIsNotNone(conn.protocol)
@@ -121,10 +121,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_acquire_submit(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password")
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password")
         connection = yield pool.acquire()
         resp = connection.submit("1 + 1")
         while True:
@@ -137,10 +137,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_maxsize(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password")
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password")
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         c3 = pool.acquire()
@@ -152,10 +152,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_release(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password")
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password")
         self.assertEqual(len(pool.pool), 0)
         c1 = yield pool.acquire()
         self.assertEqual(len(pool._acquired), 1)
@@ -165,11 +165,11 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_self_release(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password",
-                           force_release=True)
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    force_release=True)
         self.assertEqual(len(pool.pool), 0)
         c1 = yield pool.acquire()
         self.assertEqual(len(pool._acquired), 1)
@@ -180,10 +180,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_maxsize_release(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password")
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password")
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         c3 = pool.acquire()
@@ -199,10 +199,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_close(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password")
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password")
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         pool.release(c2)
@@ -213,10 +213,10 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_cancelled(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password")
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password")
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         c3 = pool.acquire()
@@ -231,10 +231,10 @@ class TornadoCtxtMngrTest(AsyncTestCase):
 
     @gen_test
     def test_pool_manager(self):
-        pool = GremlinPool(url="wss://localhost:8182/",
-                           maxsize=2,
-                           username="stephen",
-                           password="password")
+        pool = Pool(url="wss://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password")
         with (yield pool) as conn:
             self.assertFalse(conn.closed)
         self.assertEqual(len(pool.pool), 1)
@@ -253,7 +253,7 @@ class TornadoCallbackStyleTest(AsyncTestCase):
 
     def setUp(self):
         super(TornadoCallbackStyleTest, self).setUp()
-        self.pool = GremlinPool()
+        self.pool = Pool()
 
     @gen_test
     def test_data_flow(self):
@@ -275,7 +275,7 @@ class TornadoCallbackStyleTest(AsyncTestCase):
             return future
 
         result = yield execute("1 + 1")
-        self.assertIsInstance(result, GremlinStream)
+        self.assertIsInstance(result, Stream)
         resp = yield result.read()
         self.assertEqual(resp.data[0], 2)
 

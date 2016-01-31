@@ -32,6 +32,6 @@ script:
   - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then python setup.py test -s tests.test_tornado; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then python setup.py test -s tests.test_asyncio; fi
 
-after_install:
+after_script:
  - docker stop $(docker ps -a -q)
  - docker rm $(docker ps -a -q)

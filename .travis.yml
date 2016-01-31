@@ -25,7 +25,7 @@ install:
   - docker run -d --name titan1 --link es1:elasticsearch --link cas1:cassandra -p 8182:8182 davebshow/titan-websockets
 
 before_script:
-  - sleep 10
+  - sleep 30
 
 script:
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then python setup.py test -s tests.test_tornado; fi

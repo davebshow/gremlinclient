@@ -33,12 +33,12 @@ script:
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then python setup.py test -s tests.test_trollius; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then python setup.py test -s tests.test_tornado; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then python setup.py test -s tests.test_asyncio; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == '3.5' ]]; then python setup.py test -s tests.test_tornado _PEP492; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == '3.5' ]]; then python setup.py test -s tests.test_tornado_PEP492; fi
   - if [[ $TRAVIS_PYTHON_VERSION == '3.5' ]]; then coverage run --source=gremlinclient setup.py test -s tests.test_asyncio_PEP492; fi
 
 after_success:
   - coveralls
-  
+
 after_script:
  - docker stop $(docker ps -a -q)
  - docker rm $(docker ps -a -q)

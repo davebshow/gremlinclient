@@ -199,57 +199,60 @@ class Stream(object):
         elif self._conn.closed:
             future.set_exception(RuntimeError("Connection has been closed"))
         else:
-            def parser(f):
-                terminate = True
-                try:
-                    result = f.result()
-                    # result can be none if conn is closed...test that
-                except Exception as e:
-                    future.set_exception(e)
-                else:
-                    message = json.loads(result.decode("utf-8"))
-                    message = Message(message["status"]["code"],
-                                      message["result"]["data"],
-                                      message["status"]["message"],
-                                      message["result"]["meta"])
+            future = self._read(future)
+        return future
 
-                    if message.status_code == 200:
-                        future.set_result(message)
-                    elif message.status_code == 206:
-                        terminate = False
-                        future.set_result(message)
-                    elif message.status_code == 407:
-                        terminate = False
-                        try:
-                            self._conn._authenticate(
-                                self._username, self._password)
-                        except Exception as e:
-                            future.set_exception(e)
-                        else:
-                            future_read = self.read()
-                            def cb(f):
-                                try:
-                                    result = f.result()
-                                except Exception as e:
-                                    future.set_exception(e)
-                                else:
-                                    future.set_result(result)
-                            future_read.add_done_callback(cb)
-                    elif message.status_code == 204:
-                        future.set_result(message)
+    def _read(self, future):
+        def parser(f):
+            terminate = True
+            try:
+                result = f.result()
+                # result can be none if conn is closed...test that
+            except Exception as e:
+                future.set_exception(e)
+            else:
+                message = json.loads(result.decode("utf-8"))
+                message = Message(message["status"]["code"],
+                                  message["result"]["data"],
+                                  message["status"]["message"],
+                                  message["result"]["meta"])
+                if message.status_code == 200:
+                    future.set_result(message)
+                elif message.status_code == 206:
+                    terminate = False
+                    future.set_result(message)
+                elif message.status_code == 407:
+                    terminate = False
+                    try:
+                        self._conn._authenticate(
+                            self._username, self._password)
+                    except Exception as e:
+                        future.set_exception(e)
                     else:
-                        future.set_exception(
-                            RuntimeError("{0} {1}".format(
-                                message.status_code, message.message)))
-                finally:
-                    if terminate:
-                        if  self._force_close:
-                            self._conn.close()
-                        if self._force_release:
-                            self._conn.release()
-                        self._closed = True
-                        self._conn = None
+                        future_read = self.read()
+                        def cb(f):
+                            try:
+                                result = f.result()
+                            except Exception as e:
+                                future.set_exception(e)
+                            else:
+                                future.set_result(result)
+                        future_read.add_done_callback(cb)
+                elif message.status_code == 204:
+                    future.set_result(message)
+                else:
+                    future.set_exception(
+                        RuntimeError("{0} {1}".format(
+                            message.status_code, message.message)))
+            finally:
+                if terminate:
+                    if  self._force_close:
+                        self._conn.close()
+                    if self._force_release:
+                        self._conn.release()
+                    self._closed = True
+                    self._conn = None
 
 
-            future_resp = self._conn.conn.read_message(callback=parser)
+        future_resp = self._conn.conn.read_message(callback=parser)
         return future

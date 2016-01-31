@@ -1,11 +1,11 @@
-import unittest
 from datetime import timedelta
+import unittest
+
 import tornado
 from tornado import gen
 from tornado.concurrent import Future
 from tornado.websocket import WebSocketClientConnection
 from tornado.testing import gen_test, AsyncTestCase
-from tornado.ioloop import IOLoop
 from gremlinclient import (
     submit, GraphDatabase, Pool, Stream, create_connection)
 

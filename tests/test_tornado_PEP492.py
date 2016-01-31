@@ -1,10 +1,12 @@
 from datetime import timedelta
 import unittest
+
 from tornado import gen
 from tornado.concurrent import Future
 from tornado.process import Subprocess
 from tornado.websocket import WebSocketClientConnection
 from tornado.ioloop import IOLoop
+
 from gremlinclient import (
     submit, GraphDatabase, Pool, Stream, create_connection)
 

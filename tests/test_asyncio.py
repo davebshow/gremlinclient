@@ -16,7 +16,7 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
 
     def setUp(self):
         self.loop = asyncio.get_event_loop()
-        self.graph = GraphDatabase("wss://localhost:8182/",
+        self.graph = GraphDatabase("ws://localhost:8182/",
                                    username="stephen",
                                    password="password",
                                    loop=self.loop,
@@ -37,7 +37,7 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
 
 
     def test_bad_port_exception(self):
-        graph = GraphDatabase(url="wss://localhost:81/", loop=self.loop,
+        graph = GraphDatabase(url="ws://localhost:81/", loop=self.loop,
                               future_class=Future)
 
         @asyncio.coroutine
@@ -49,18 +49,18 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
 
 
     def test_wrong_protocol_exception(self):
-        graph = GraphDatabase(url="ws://localhost:8182/", loop=self.loop,
+        graph = GraphDatabase(url="wss://localhost:8182/", loop=self.loop,
                               future_class=Future)
         @asyncio.coroutine
         def go():
-            with self.assertRaises(tornado.httpclient.HTTPError):
+            with self.assertRaises(RuntimeError):
                 connection = yield from graph.connect()
 
         self.loop.run_until_complete(go())
 
 
     def test_bad_host_exception(self):
-        graph = GraphDatabase(url="wss://locaost:8182/", loop=self.loop,
+        graph = GraphDatabase(url="ws://locaost:8182/", loop=self.loop,
                               future_class=Future)
 
         @asyncio.coroutine
@@ -111,22 +111,22 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
 
         self.loop.run_until_complete(go())
 
-    def test_creditials_error(self):
-
-        @asyncio.coroutine
-        def go():
-            graph = GraphDatabase("wss://localhost:8182/",
-                                  username="stephen",
-                                  password="passwor",
-                                  loop=self.loop,
-                                  future_class=Future)
-            connection = yield from graph.connect()
-            resp = connection.submit("1 + 1")
-            with self.assertRaises(RuntimeError):
-                msg = yield from resp.read()
-            connection.conn.close()
-
-        self.loop.run_until_complete(go())
+    # def test_creditials_error(self):
+    #
+    #     @asyncio.coroutine
+    #     def go():
+    #         graph = GraphDatabase("ws://localhost:8182/",
+    #                               username="stephen",
+    #                               password="passwor",
+    #                               loop=self.loop,
+    #                               future_class=Future)
+    #         connection = yield from graph.connect()
+    #         resp = connection.submit("1 + 1")
+    #         with self.assertRaises(RuntimeError):
+    #             msg = yield from resp.read()
+    #         connection.conn.close()
+    #
+    #     self.loop.run_until_complete(go())
 
     def test_force_close(self):
 
@@ -151,7 +151,7 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop = asyncio.get_event_loop()
 
     def test_acquire(self):
-        pool = Pool(url="wss://localhost:8182/",
+        pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password",
@@ -179,7 +179,7 @@ class AsyncioPoolTest(unittest.TestCase):
 
 
     def test_acquire_submit(self):
-        pool = Pool(url="wss://localhost:8182/",
+        pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password",
@@ -201,7 +201,7 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
     def test_maxsize(self):
-        pool = Pool(url="wss://localhost:8182/",
+        pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password",
@@ -222,7 +222,7 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
     def test_release(self):
-        pool = Pool(url="wss://localhost:8182/",
+        pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password",
@@ -241,7 +241,7 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
     def test_self_release(self):
-        pool = Pool(url="wss://localhost:8182/",
+        pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password",
@@ -262,7 +262,7 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
     def test_maxsize_release(self):
-        pool = Pool(url="wss://localhost:8182/",
+        pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password",
@@ -287,7 +287,7 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
     def test_close(self):
-        pool = Pool(url="wss://localhost:8182/",
+        pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password",
@@ -306,7 +306,7 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
     def test_cancelled(self):
-        pool = Pool(url="wss://localhost:8182/",
+        pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password",
@@ -330,7 +330,7 @@ class AsyncioCtxtMngrTest(unittest.TestCase):
         self.loop = asyncio.get_event_loop()
 
     def test_pool_manager(self):
-        pool = Pool(url="wss://localhost:8182/",
+        pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password",
@@ -346,7 +346,7 @@ class AsyncioCtxtMngrTest(unittest.TestCase):
             pool.close()
 
     def test_graph_manager(self):
-        graph = GraphDatabase(url="wss://localhost:8182/",
+        graph = GraphDatabase(url="ws://localhost:8182/",
                               username="stephen",
                               password="password",
                               loop=self.loop,
@@ -366,7 +366,7 @@ class AsyncioCallbackStyleTest(unittest.TestCase):
 
         def execute(script):
             future = Future()
-            graph = GraphDatabase(url="wss://localhost:8182/",
+            graph = GraphDatabase(url="ws://localhost:8182/",
                                   username="stephen",
                                   password="password",
                                   loop=self.loop,
@@ -402,7 +402,7 @@ class AsyncioAPITests(unittest.TestCase):
         @asyncio.coroutine
         def go():
             conn = yield from create_connection(
-                url="wss://localhost:8182/", password="password",
+                url="ws://localhost:8182/", password="password",
                 username="stephen", loop=self.loop, future_class=Future)
             self.assertIsNotNone(conn.conn.protocol)
             conn.close()
@@ -415,7 +415,7 @@ class AsyncioAPITests(unittest.TestCase):
         @asyncio.coroutine
         def go():
             stream = yield from submit(
-                "1 + 1", url="wss://localhost:8182/",
+                "1 + 1", url="ws://localhost:8182/",
                 password="password", username="stephen", loop=self.loop,
                 future_class=Future)
             while True:
@@ -433,7 +433,7 @@ class AsyncioAPITests(unittest.TestCase):
         def go():
             with self.assertRaises(RuntimeError):
                 stream = yield from submit("throw new Exception('error')",
-                                      url="wss://localhost:8182/",
+                                      url="ws://localhost:8182/",
                                       password="password", username="stephen",
                                       loop=self.loop, future_class=Future)
                 yield from stream.read()

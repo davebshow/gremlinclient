@@ -92,6 +92,9 @@ class GraphDatabase(AbstractBaseGraph):
 
     if PY_33:
         exec(textwrap.dedent("""
+        def __iter__(self):
+            return self.__await__()
+
         def __await__(self):
             future = self._future_class()
             future_conn = self.connect()
@@ -106,17 +109,19 @@ class GraphDatabase(AbstractBaseGraph):
                         _GraphConnectionContextManager(conn))
 
             future_conn.add_done_callback(on_connect)
-            return (yield future)"""))
+            if isinstance(future, concurrent.Future):
+                return (yield future)
+            return (yield from future)
+            """))
 
-    if PY_35:
-        exec(textwrap.dedent("""
-
-        def connection(self):
-            '''Return async context manager for working with connection.
-
-            async with pool.get() as conn:
-            '''
-            return _AsyncConnectionContextManager(self)"""))
+    # if PY_35:
+    #     exec(textwrap.dedent("""
+    #     def connection(self):
+    #         '''Return async context manager for working with connection.
+    #
+    #         async with pool.get() as conn:
+    #         '''
+    #         return _AsyncGraphConnectionContextManager(self)"""))
 
 
 class _GraphConnectionContextManager(object):
@@ -136,24 +141,22 @@ class _GraphConnectionContextManager(object):
             self._conn = None
 
 
-if PY_35:
-    # Need to implement/test
-    exec(textwrap.dedent("""
-    import asyncio
-    class _AsyncGraphConnectionContextManager:
-
-        __slots__ = ('_conn')
-
-        def __init__(self, conn):
-            self._conn = None
-
-        @asyncio.coroutine
-        def __aenter__(self):
-            return self._conn
-
-        @asyncio.coroutine
-        def __aexit__(self, exc_type, exc_value, tb):
-            try:
-                self._conn.close()
-            finally:
-                self._conn = None"""))
+# if PY_35:
+#     # Need to implement/test
+#     exec(textwrap.dedent("""
+#     class _AsyncGraphConnectionContextManager:
+#
+#         __slots__ = ('_conn')
+#
+#         def __init__(self):
+#             self._conn = None
+#
+#         async def __aenter__(self):
+#             self._conn = await self.connect()
+#             return self._conn
+#
+#         async def __aexit__(self, exc_type, exc_value, tb):
+#             try:
+#                 self._conn.close()
+#             finally:
+#                 self._conn = None"""))

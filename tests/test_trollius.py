@@ -242,6 +242,24 @@ class TrolliusPoolTest(unittest.TestCase):
 
         self.loop.run_until_complete(go())
 
+    def test_release_closed(self):
+        pool = Pool(url="ws://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    future_class=Future)
+        self.assertEqual(len(pool.pool), 0)
+
+        @trollius.coroutine
+        def go():
+            c1 = yield From(pool.acquire())
+            self.assertEqual(len(pool._acquired), 1)
+            c1.close()
+            pool.release(c1)
+            self.assertEqual(len(pool.pool), 0)
+            self.assertEqual(len(pool._acquired), 0)
+        self.loop.run_until_complete(go())
+
     def test_self_release(self):
         pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,

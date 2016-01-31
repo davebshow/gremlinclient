@@ -241,6 +241,24 @@ class AsyncioPoolTest(unittest.TestCase):
 
         self.loop.run_until_complete(go())
 
+    def test_release_closed(self):
+        pool = Pool(url="ws://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    future_class=Future)
+        self.assertEqual(len(pool.pool), 0)
+
+        @asyncio.coroutine
+        def go():
+            c1 = yield from pool.acquire()
+            self.assertEqual(len(pool._acquired), 1)
+            c1.close()
+            pool.release(c1)
+            self.assertEqual(len(pool.pool), 0)
+            self.assertEqual(len(pool._acquired), 0)
+        self.loop.run_until_complete(go())
+
     def test_self_release(self):
         pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
@@ -346,6 +364,8 @@ class AsyncioCtxtMngrTest(unittest.TestCase):
             self.assertEqual(len(pool._acquired), 0)
             pool.close()
 
+        self.loop.run_until_complete(go())
+
     def test_graph_manager(self):
         graph = GraphDatabase(url="ws://localhost:8182/",
                               username="stephen",
@@ -357,6 +377,9 @@ class AsyncioCtxtMngrTest(unittest.TestCase):
         def go():
             with (yield from graph) as conn:
                 self.assertFalse(conn.closed)
+
+        self.loop.run_until_complete(go())
+
 
 class AsyncioCallbackStyleTest(unittest.TestCase):
 

@@ -146,6 +146,9 @@ class Pool(object):
 
     if PY_33:
         exec(textwrap.dedent("""
+        def __iter__(self):
+            return self.__await__()
+
         def __await__(self):
             future = self._future_class()
             future_conn = self.acquire()
@@ -160,18 +163,18 @@ class Pool(object):
                         _PoolConnectionContextManager(self, conn))
 
             future_conn.add_done_callback(on_connect)
-            return (yield future)"""))
+            if isinstance(future, concurrent.Future):
+                return (yield future)
+            return (yield from future)"""))
 
-
-
-    if PY_35:
-        exec(textwrap.dedent("""
-        def connection(self):
-            '''Return async context manager for working with connection.
-
-            async with pool.get() as conn:
-            '''
-            return _AsyncConnectionContextManager(self)"""))
+    # if PY_35:
+    #     exec(textwrap.dedent("""
+    #     def connection(self):
+    #         '''Return async context manager for working with connection.
+    #
+    #         async with pool.get() as conn:
+    #         '''
+    #         return _AsyncConnectionContextManager(self)"""))
 
 
 class _PoolConnectionContextManager(object):
@@ -193,29 +196,23 @@ class _PoolConnectionContextManager(object):
             self._conn = None
 
 
-# The follwoing is taken from:
-# https://github.com/aio-libs/aioredis/blob/master/aioredis/pool.py
-# will have to test both styles
-if PY_35:
-    exec(textwrap.dedent("""
-    import asyncio
-    class _AsyncPoolConnectionContextManager:
-
-        __slots__ = ('_pool', '_conn')
-
-        def __init__(self, pool):
-            self._pool = pool
-            self._conn = None
-
-        @asyncio.coroutine
-        def __aenter__(self):
-            self._conn = yield from self._pool.acquire()
-            return self._conn
-
-        @asyncio.coroutine
-        def __aexit__(self, exc_type, exc_value, tb):
-            try:
-                self._pool.release(self._conn)
-            finally:
-                self._pool = None
-                self._conn = None"""))
+# if PY_35:
+#     exec(textwrap.dedent("""
+#     class _AsyncPoolConnectionContextManager:
+#
+#         __slots__ = ('_pool', '_conn')
+#
+#         def __init__(self, pool):
+#             self._pool = pool
+#             self._conn = None
+#
+#         async def __aenter__(self):
+#             self._conn = await self._pool.acquire()
+#             return self._conn
+#
+#         async def __aexit__(self, exc_type, exc_value, tb):
+#             try:
+#                 self._pool.release(self._conn)
+#             finally:
+#                 self._pool = None
+#                 self._conn = None"""))

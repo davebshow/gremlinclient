@@ -164,6 +164,20 @@ class TornadoPoolTest(AsyncTestCase):
         self.assertEqual(len(pool._acquired), 0)
 
     @gen_test
+    def test_release_closed(self):
+        pool = Pool(url="ws://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password")
+        self.assertEqual(len(pool.pool), 0)
+        c1 = yield pool.acquire()
+        self.assertEqual(len(pool._acquired), 1)
+        c1.close()
+        pool.release(c1)
+        self.assertEqual(len(pool.pool), 0)
+        self.assertEqual(len(pool._acquired), 0)
+
+    @gen_test
     def test_self_release(self):
         pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,

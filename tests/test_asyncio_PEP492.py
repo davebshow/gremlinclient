@@ -1,50 +1,27 @@
-from datetime import timedelta
 import unittest
-from tornado import gen
-from tornado.concurrent import Future
-from tornado.process import Subprocess
+import asyncio
+from asyncio import Future
+import unittest
+import tornado
 from tornado.websocket import WebSocketClientConnection
-from tornado.ioloop import IOLoop
+from tornado.platform.asyncio import AsyncIOMainLoop
 from gremlinclient import (
     submit, GraphDatabase, Pool, Stream, create_connection)
 
 
-# setUp/tearDown/get_new_ioloop based on:
-# http://www.tornadoweb.org/en/stable/_modules/tornado/testing.html#AsyncTestCase
+AsyncIOMainLoop().install()
 
 
-class TornadoFactoryConnectTest(unittest.TestCase):
+class AsyncioFactoryConnectTest(unittest.TestCase):
 
     def setUp(self):
-        super(TornadoFactoryConnectTest, self).setUp()
-        self.loop = self.get_new_ioloop()
-        self.loop.make_current()
+        self.loop = asyncio.get_event_loop()
         self.graph = GraphDatabase("ws://localhost:8182/",
                                    username="stephen",
                                    password="password",
                                    loop=self.loop,
                                    future_class=Future)
 
-    def tearDown(self):
-        # Clean up Subprocess, so it can be used again with a new ioloop.
-        Subprocess.uninitialize()
-        self.loop.clear_current()
-        if (not IOLoop.initialized() or
-                self.loop is not IOLoop.instance()):
-            # Try to clean up any file descriptors left open in the ioloop.
-            # This avoids leaks, especially when tests are run repeatedly
-            # in the same process with autoreload (because curl does not
-            # set FD_CLOEXEC on its file descriptors)
-            self.loop.close(all_fds=True)
-        super(TornadoFactoryConnectTest, self).tearDown()
-
-
-    def get_new_ioloop(self):
-        """Creates a new `.IOLoop` for this test.  May be overridden in
-        subclasses for tests that require a specific `.IOLoop` (usually
-        the singleton `.IOLoop.instance()`).
-        """
-        return IOLoop()
 
     def test_connect(self):
 
@@ -55,7 +32,7 @@ class TornadoFactoryConnectTest(unittest.TestCase):
             self.assertIsInstance(conn, WebSocketClientConnection)
             conn.close()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
 
     def test_bad_port_exception(self):
@@ -66,7 +43,7 @@ class TornadoFactoryConnectTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 connection = await graph.connect()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
 
     def test_wrong_protocol_exception(self):
@@ -77,7 +54,7 @@ class TornadoFactoryConnectTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 connection = await graph.connect()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
 
     def test_bad_host_exception(self):
@@ -88,7 +65,7 @@ class TornadoFactoryConnectTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 connection = await graph.connect()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
     def test_submit(self):
 
@@ -103,7 +80,7 @@ class TornadoFactoryConnectTest(unittest.TestCase):
                 self.assertEqual(msg.data[0], 2)
             connection.conn.close()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
     def test_read_one_on_closed(self):
 
@@ -114,7 +91,7 @@ class TornadoFactoryConnectTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 msg = await resp.read()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
     def test_null_read_on_closed(self):
 
@@ -126,7 +103,7 @@ class TornadoFactoryConnectTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 msg = await stream.read()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
     # def test_creditials_error(self):
     #
@@ -143,7 +120,7 @@ class TornadoFactoryConnectTest(unittest.TestCase):
     #             msg = await resp.read()
     #         connection.conn.close()
     #
-    #     self.loop.run_sync(go)
+    #     self.loop.run_until_complete(go())
 
     def test_force_close(self):
 
@@ -158,36 +135,13 @@ class TornadoFactoryConnectTest(unittest.TestCase):
                 self.assertEqual(msg.data[0], 2)
             self.assertIsNone(connection.conn.protocol)
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
 
-class TornadoPoolTest(unittest.TestCase):
+class AsyncioPoolTest(unittest.TestCase):
 
     def setUp(self):
-        super(TornadoPoolTest, self).setUp()
-        self.loop = self.get_new_ioloop()
-        self.loop.make_current()
-
-    def tearDown(self):
-        # Clean up Subprocess, so it can be used again with a new ioloop.
-        Subprocess.uninitialize()
-        self.loop.clear_current()
-        if (not IOLoop.initialized() or
-                self.loop is not IOLoop.instance()):
-            # Try to clean up any file descriptors left open in the ioloop.
-            # This avoids leaks, especially when tests are run repeatedly
-            # in the same process with autoreload (because curl does not
-            # set FD_CLOEXEC on its file descriptors)
-            self.loop.close(all_fds=True)
-        super(TornadoPoolTest, self).tearDown()
-
-
-    def get_new_ioloop(self):
-        """Creates a new `.IOLoop` for this test.  May be overridden in
-        subclasses for tests that require a specific `.IOLoop` (usually
-        the singleton `.IOLoop.instance()`).
-        """
-        return IOLoop()
+        self.loop = asyncio.get_event_loop()
 
     def test_acquire(self):
         pool = Pool(url="ws://localhost:8182/",
@@ -213,7 +167,7 @@ class TornadoPoolTest(unittest.TestCase):
             conn.close()
             conn2.close()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
 
     def test_acquire_submit(self):
@@ -235,7 +189,7 @@ class TornadoPoolTest(unittest.TestCase):
                 self.assertEqual(msg.data[0], 2)
             connection.conn.close()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
     def test_maxsize(self):
         pool = Pool(url="ws://localhost:8182/",
@@ -250,12 +204,12 @@ class TornadoPoolTest(unittest.TestCase):
             c2 = await pool.acquire()
             c3 = pool.acquire()
             self.assertIsInstance(c3, Future)
-            with self.assertRaises(gen.TimeoutError):
-                await gen.with_timeout(timedelta(seconds=0.1), c3)
+            with self.assertRaises(asyncio.TimeoutError):
+                await asyncio.wait_for(c3, 0.1)
             c1.conn.close()
             c2.conn.close()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
     def test_release(self):
         pool = Pool(url="ws://localhost:8182/",
@@ -273,7 +227,7 @@ class TornadoPoolTest(unittest.TestCase):
             self.assertEqual(len(pool.pool), 1)
             self.assertEqual(len(pool._acquired), 0)
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
     def test_self_release(self):
         pool = Pool(url="ws://localhost:8182/",
@@ -293,7 +247,7 @@ class TornadoPoolTest(unittest.TestCase):
             self.assertEqual(len(pool.pool), 1)
             self.assertEqual(len(pool._acquired), 0)
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
     def test_maxsize_release(self):
         pool = Pool(url="ws://localhost:8182/",
@@ -307,8 +261,9 @@ class TornadoPoolTest(unittest.TestCase):
             c2 = await pool.acquire()
             c3 = pool.acquire()
             self.assertIsInstance(c3, Future)
-            with self.assertRaises(gen.TimeoutError):
-                await gen.with_timeout(timedelta(seconds=0.1), c3)
+            with self.assertRaises(asyncio.TimeoutError):
+                shielded_fut = asyncio.shield(c3)
+                await asyncio.wait_for(shielded_fut, 0.1)
             pool.release(c2)
             c3 = await c3
             self.assertEqual(c2, c3)
@@ -316,7 +271,7 @@ class TornadoPoolTest(unittest.TestCase):
             c2.conn.close()
             c3.conn.close()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
     def test_close(self):
         pool = Pool(url="ws://localhost:8182/",
@@ -334,7 +289,7 @@ class TornadoPoolTest(unittest.TestCase):
             self.assertIsNotNone(c1.conn.protocol)
             c1.close()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
     def test_cancelled(self):
         pool = Pool(url="ws://localhost:8182/",
@@ -348,40 +303,16 @@ class TornadoPoolTest(unittest.TestCase):
             c2 = await pool.acquire()
             c3 = pool.acquire()
             pool.close()
-            # Tornado futures don't support cancellation
-            # self.assertTrue(c3.cancelled())
+            self.assertTrue(c3.cancelled())
             c1.close()
             c2.close()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
-class TornadoCnxtMngrTest(unittest.TestCase):
+class AsyncioCtxtMngrTest(unittest.TestCase):
 
     def setUp(self):
-        super(TornadoCnxtMngrTest, self).setUp()
-        self.loop = self.get_new_ioloop()
-        self.loop.make_current()
-
-    def tearDown(self):
-        # Clean up Subprocess, so it can be used again with a new ioloop.
-        Subprocess.uninitialize()
-        self.loop.clear_current()
-        if (not IOLoop.initialized() or
-                self.loop is not IOLoop.instance()):
-            # Try to clean up any file descriptors left open in the ioloop.
-            # This avoids leaks, especially when tests are run repeatedly
-            # in the same process with autoreload (because curl does not
-            # set FD_CLOEXEC on its file descriptors)
-            self.loop.close(all_fds=True)
-        super(TornadoCnxtMngrTest, self).tearDown()
-
-
-    def get_new_ioloop(self):
-        """Creates a new `.IOLoop` for this test.  May be overridden in
-        subclasses for tests that require a specific `.IOLoop` (usually
-        the singleton `.IOLoop.instance()`).
-        """
-        return IOLoop()
+        self.loop = asyncio.get_event_loop()
 
     def test_pool_manager(self):
         pool = Pool(url="ws://localhost:8182/",
@@ -409,33 +340,10 @@ class TornadoCnxtMngrTest(unittest.TestCase):
             with await graph as conn:
                 self.assertFalse(conn.closed)
 
-class TornadoCallbackStyleTest(unittest.TestCase):
+class AsyncioCallbackStyleTest(unittest.TestCase):
 
     def setUp(self):
-        super(TornadoCallbackStyleTest, self).setUp()
-        self.loop = self.get_new_ioloop()
-        self.loop.make_current()
-
-    def tearDown(self):
-        # Clean up Subprocess, so it can be used again with a new ioloop.
-        Subprocess.uninitialize()
-        self.loop.clear_current()
-        if (not IOLoop.initialized() or
-                self.loop is not IOLoop.instance()):
-            # Try to clean up any file descriptors left open in the ioloop.
-            # This avoids leaks, especially when tests are run repeatedly
-            # in the same process with autoreload (because curl does not
-            # set FD_CLOEXEC on its file descriptors)
-            self.loop.close(all_fds=True)
-        super(TornadoCallbackStyleTest, self).tearDown()
-
-
-    def get_new_ioloop(self):
-        """Creates a new `.IOLoop` for this test.  May be overridden in
-        subclasses for tests that require a specific `.IOLoop` (usually
-        the singleton `.IOLoop.instance()`).
-        """
-        return IOLoop()
+        self.loop = asyncio.get_event_loop()
 
     def test_data_flow(self):
 
@@ -463,36 +371,13 @@ class TornadoCallbackStyleTest(unittest.TestCase):
             resp = await result.read()
             self.assertEqual(resp.data[0], 2)
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
 
-class TornadoAPITest(unittest.TestCase):
+class AsyncioAPITests(unittest.TestCase):
 
     def setUp(self):
-        super(TornadoAPITest, self).setUp()
-        self.loop = self.get_new_ioloop()
-        self.loop.make_current()
-
-    def tearDown(self):
-        # Clean up Subprocess, so it can be used again with a new ioloop.
-        Subprocess.uninitialize()
-        self.loop.clear_current()
-        if (not IOLoop.initialized() or
-                self.loop is not IOLoop.instance()):
-            # Try to clean up any file descriptors left open in the ioloop.
-            # This avoids leaks, especially when tests are run repeatedly
-            # in the same process with autoreload (because curl does not
-            # set FD_CLOEXEC on its file descriptors)
-            self.loop.close(all_fds=True)
-        super(TornadoAPITest, self).tearDown()
-
-
-    def get_new_ioloop(self):
-        """Creates a new `.IOLoop` for this test.  May be overridden in
-        subclasses for tests that require a specific `.IOLoop` (usually
-        the singleton `.IOLoop.instance()`).
-        """
-        return IOLoop()
+        self.loop = asyncio.get_event_loop()
 
     def test_create_connection(self):
 
@@ -503,7 +388,7 @@ class TornadoAPITest(unittest.TestCase):
             self.assertIsNotNone(conn.conn.protocol)
             conn.close()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
 
     def test_submit(self):
@@ -520,7 +405,7 @@ class TornadoAPITest(unittest.TestCase):
                 self.assertEqual(msg.status_code, 200)
                 self.assertEqual(msg.data[0], 2)
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
     def test_script_exception(self):
 
@@ -532,7 +417,7 @@ class TornadoAPITest(unittest.TestCase):
                                       loop=self.loop, future_class=Future)
                 await stream.read()
 
-        self.loop.run_sync(go)
+        self.loop.run_until_complete(go())
 
 
 

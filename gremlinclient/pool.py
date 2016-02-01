@@ -14,10 +14,9 @@ PY_35 = sys.version_info >= (3, 5)
 
 class Pool(object):
 
-    def __init__(self, url='ws://localhost:8182/', lang="gremlin-groovy",
-                 processor="", timeout=None, username="", password="",
-                 graph=None, maxsize=256, loop=None, force_release=False,
-                 future_class=None):
+    def __init__(self, url='ws://localhost:8182/', timeout=None,
+                 username="", password="", graph=None, maxsize=256, loop=None,
+                 force_release=False, future_class=None):
         self._maxsize = maxsize
         self._pool = collections.deque()
         self._waiters = collections.deque()
@@ -28,9 +27,7 @@ class Pool(object):
         self._force_release = force_release
         self._future_class = future_class or concurrent.Future
         # This may change depending on how other factories are passed
-        self._graph = graph or GraphDatabase(url=url,
-                                             lang=lang,
-                                             processor=processor,
+        self._graph = graph or GraphDatabase(url,
                                              timeout=timeout,
                                              username=username,
                                              password=password,

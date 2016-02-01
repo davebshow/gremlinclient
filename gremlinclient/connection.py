@@ -34,13 +34,11 @@ class Connection(object):
     :param bool force_release: If possible, force release to pool after read.
     :param str session: Session id (optional). Typically a uuid
     """
-    def __init__(self, conn, lang="gremlin-groovy", processor="",
-                 timeout=None, username="", password="", loop=None,
-                 validate_cert=False, force_close=False, future_class=None,
-                 pool=None, force_release=False, session=None):
+    def __init__(self, conn, timeout=None, username="", password="",
+                 loop=None, validate_cert=False, force_close=False,
+                 future_class=None, pool=None, force_release=False,
+                 session=None):
         self._conn = conn
-        self._lang = lang
-        self._processor = processor
         self._closed = False
         self._session = session
         self._timeout = timeout
@@ -79,8 +77,8 @@ class Connection(object):
         self._closed = True
         self._pool = None
 
-    def submit(self, gremlin, bindings=None, lang=None, rebindings=None,
-               op="eval", processor=None, session=None,
+    def submit(self, gremlin, bindings=None, lang="gremlin-groovy",
+               aliases=None, op="eval", processor="", session=None,
                timeout=None):
         """
         Submit a script to the Gremlin Server.
@@ -88,7 +86,7 @@ class Connection(object):
         :param dict bindings: A mapping of bindings for Gremlin script.
         :param str lang: Language of scripts submitted to the server.
             "gremlin-groovy" by default
-        :param dict rebindings: Rebind ``Graph`` and ``TraversalSource``
+        :param dict aliases: Rebind ``Graph`` and ``TraversalSource``
             objects to different variable names in the current request
         :param str op: Gremlin Server op argument. "eval" by default.
         :param str processor: Gremlin Server processor argument. "" by default.
@@ -100,32 +98,28 @@ class Connection(object):
 
         :returns: :py:class:`gremlinclient.connection.Stream` object
         """
-        lang = lang or self._lang
-        processor = processor or self._processor
         if session is None:
             session = self._session
         if timeout is None:
             timeout = self._timeout
-        if rebindings is None:
-            rebindings = {}
-
+        if aliases is None:
+            aliases = {}
         message = self._prepare_message(
-            gremlin, bindings=bindings, lang=lang, rebindings=rebindings,
-            op=op, processor=processor, session=session)
+            gremlin, bindings, lang, aliases, op, processor, session)
 
-        message = json.dumps(message)
-        message = self._set_message_header(message, "application/json")
         self.conn.write_message(message, binary=True)
 
         return Stream(self,
-                             force_close=self._force_close,
-                             force_release=self._force_release,
-                             username=self._username,
-                             password=self._password,
-                             future_class=self._future_class)
+                      session,
+                      processor,
+                      self._loop,
+                      self._username,
+                      self._password,
+                      self._force_close,
+                      self._force_release,
+                      self._future_class)
 
-    @staticmethod
-    def _prepare_message(gremlin, bindings, lang, rebindings, op, processor,
+    def _prepare_message(self, gremlin, bindings, lang, aliases, op, processor,
                          session):
         message = {
             "requestId": str(uuid.uuid4()),
@@ -135,27 +129,13 @@ class Connection(object):
                 "gremlin": gremlin,
                 "bindings": bindings,
                 "language":  lang,
-                "rebindings": rebindings
+                "aliases": aliases
             }
         }
-        if session is None:
-            if processor == "session":
-                raise RuntimeError("session processor requires a session id")
-        else:
-            message["args"].update({"session": session})
+        message = self._finalize_message(message, session, processor)
         return message
 
-    @staticmethod
-    def _set_message_header(message, mime_type):
-        if mime_type == "application/json":
-            mime_len = b"\x10"
-            mime_type = b"application/json"
-        else:
-            raise ValueError("Unknown mime type.")
-        return b"".join([mime_len, mime_type, message.encode("utf-8")])
-
-    def _authenticate(self, username, password, session=None, processor=""):
-        # Maybe join with submit to avoid repeating code.
+    def _authenticate(self, username, password, session, processor):
         auth = b"".join([b"\x00", username.encode("utf-8"),
                          b"\x00", password.encode("utf-8")])
         message = {
@@ -166,14 +146,26 @@ class Connection(object):
                 "sasl": base64.b64encode(auth).decode()
             }
         }
-        if session is None:
-            if processor == "session":
+        message = self._finalize_message(message, session, processor)
+        self.conn.write_message(message, binary=True)
+
+    def _finalize_message(self, message, session, processor):
+        if processor == "session":
+            if session is None:
                 raise RuntimeError("session processor requires a session id")
-        else:
-            message["args"].update({"session": session})
+            else:
+                message["args"].update({"session": session})
         message = json.dumps(message)
-        message = self._set_message_header(message, "application/json")
-        return self.conn.write_message(message, binary=True)
+        return self._set_message_header(message, "application/json")
+
+    @staticmethod
+    def _set_message_header(message, mime_type):
+        if mime_type == "application/json":
+            mime_len = b"\x10"
+            mime_type = b"application/json"
+        else:
+            raise ValueError("Unknown mime type.")
+        return b"".join([mime_len, mime_type, message.encode("utf-8")])
 
 
 class Stream(object):
@@ -181,10 +173,11 @@ class Stream(object):
 
     """
 
-    def __init__(self, conn, session=None, loop=None, username="",
-                 password="", force_close=False,
-                 force_release=False, future_class=None):
+    def __init__(self, conn, session, processor, loop, username, password,
+                 force_close, force_release, future_class):
         self._conn = conn
+        self._session = session
+        self._processor = processor
         self._closed = False
         self._username = username
         self._password = password
@@ -226,7 +219,8 @@ class Stream(object):
                     terminate = False
                     try:
                         self._conn._authenticate(
-                            self._username, self._password)
+                            self._username, self._password, self._session,
+                            self._processor)
                     except Exception as e:
                         future.set_exception(e)
                     else:

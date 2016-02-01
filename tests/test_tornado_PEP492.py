@@ -124,7 +124,8 @@ class TornadoFactoryConnectTest(unittest.TestCase):
             connection = await self.graph.connect()
             # build connection
             connection.close()
-            stream = Stream(connection, future_class=Future)
+            stream = Stream(connection, None, "processor", None, "stephen",
+                            "password", False, False, Future)
             with self.assertRaises(RuntimeError):
                 msg = await stream.read()
 

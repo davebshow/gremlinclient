@@ -17,12 +17,9 @@ PY_35 = sys.version_info >= (3, 5)
 class GraphDatabase(object):
     """This class generates connections to the Gremlin Server"""
 
-    def __init__(self, url='ws://localhost:8182/', lang="gremlin-groovy",
-                 processor="", timeout=None, username="", password="",
+    def __init__(self, url, timeout=None, username="", password="",
                  loop=None, validate_cert=False, future_class=None):
         self._url = url
-        self._lang = lang
-        self._processor = processor
         self._timeout = timeout
         self._username = username
         self._password = password
@@ -30,7 +27,13 @@ class GraphDatabase(object):
         self._validate_cert = validate_cert
         self._future_class = future_class or concurrent.Future
 
-    def connect(self, force_close=False, force_release=False, pool=None):
+    def connect(self,
+                session=None,
+                force_close=False,
+                force_release=False,
+                pool=None):
+        # Will provide option for user to build own request,
+        # implement with SSL tests.
         request = HTTPRequest(self._url, validate_cert=self._validate_cert)
         future = self._future_class()
         future_conn = websocket_connect(request)
@@ -47,11 +50,10 @@ class GraphDatabase(object):
             except HTTPError as e:
                 future.set_exception(e)
             else:
-                gc = Connection(conn, self._lang, self._processor,
-                                self._timeout, self._username,
-                                self._password, force_close=force_close,
-                                force_release=force_release, pool=pool,
-                                future_class=self._future_class)
+                gc = Connection(conn, self._timeout, self._username,
+                                self._password, self._loop, self._validate_cert,
+                                force_close, self._future_class, pool,
+                                force_release, session)
                 future.set_result(gc)
         future_conn.add_done_callback(get_conn)
         return future

@@ -69,7 +69,8 @@ class TornadoFactoryConnectTest(AsyncTestCase):
         connection = yield self.graph.connect()
         # build connection
         connection.close()
-        stream = Stream(connection)
+        stream = Stream(connection, None, "processor", None, "stephen",
+                        "password", False, False, Future)
         with self.assertRaises(RuntimeError):
             msg = yield stream.read()
 

@@ -7,7 +7,6 @@ from tornado.httpclient import HTTPRequest, HTTPError
 from tornado.ioloop import IOLoop
 from tornado.websocket import websocket_connect
 
-from gremlinclient.base import AbstractBaseGraph
 from gremlinclient.connection import Connection
 
 
@@ -15,7 +14,7 @@ PY_33 = sys.version_info >= (3, 3)
 PY_35 = sys.version_info >= (3, 5)
 
 
-class GraphDatabase(AbstractBaseGraph):
+class GraphDatabase(object):
     """This class generates connections to the Gremlin Server"""
 
     def __init__(self, url='ws://localhost:8182/', lang="gremlin-groovy",
@@ -66,9 +65,9 @@ class GraphDatabase(AbstractBaseGraph):
             "context manager should use some variation of yield/yield from")
 
     def __exit__(self, *args):
-        pass
+        pass  # pragma: no cover
 
-    if not PY_33:
+    if not PY_33:  # pragma: no cover
         def __await__(self):
             future = self._future_class()
             future_conn = self.connect()
@@ -90,7 +89,7 @@ class GraphDatabase(AbstractBaseGraph):
             e.args = (result,)
             raise e
 
-    if PY_33:
+    if PY_33:  # pragma: no cover
         exec(textwrap.dedent("""
         def __iter__(self):
             return self.__await__()

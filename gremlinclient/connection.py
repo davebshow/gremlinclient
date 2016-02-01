@@ -6,15 +6,13 @@ import uuid
 from tornado import concurrent
 from tornado.ioloop import IOLoop
 
-from gremlinclient.base import AbstractBaseConnection
-
 
 Message = collections.namedtuple(
     "Message",
     ["status_code", "data", "message", "metadata"])
 
 
-class Connection(AbstractBaseConnection):
+class Connection(object):
     """This class encapsulates a connection to the Gremlin Server using the
     Tornado websocket client implementation.
     :param str url: url for Gremlin Server (optional). 'http://localhost:8182/'
@@ -56,22 +54,6 @@ class Connection(AbstractBaseConnection):
         return self._conn
 
     @property
-    def processor(self):
-        """Readonly property. The processor argument for Gremlin
-        Server"""
-        return self._processor
-
-    @property
-    def lang(self):
-        """Readonly property. The language used for Gremlin scripts"""
-        return self._lang
-
-    @property
-    def url(self):
-        """Getter for database url used by the client"""
-        return self._url
-
-    @property
     def closed(self):
         """Readonly property. Return True if client has been closed"""
         return self._closed or self._conn.protocol is None
@@ -102,8 +84,8 @@ class Connection(AbstractBaseConnection):
             (optional)
         :returns: :py:class:`gremlinclient.client.Stream` object
         """
-        lang = lang or self.lang
-        processor = processor or self.processor
+        lang = lang or self._lang
+        processor = processor or self._processor
         if session is None:
             session = self._session
         if timeout is None:

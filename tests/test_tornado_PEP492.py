@@ -277,6 +277,21 @@ class TornadoPoolTest(unittest.TestCase):
 
         self.loop.run_sync(go)
 
+    def test_release_acquire(self):
+        pool = Pool(url="ws://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    future_class=Future)
+
+        async def go():
+            c1 = await pool.acquire()
+            pool.release(c1)
+            c2 = await pool.acquire()
+            self.assertEqual(c1, c2)
+
+        self.loop.run_sync(go)
+
     def test_release_closed(self):
         pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
@@ -334,6 +349,30 @@ class TornadoPoolTest(unittest.TestCase):
             c1.conn.close()
             c2.conn.close()
             c3.conn.close()
+
+        self.loop.run_sync(go)
+
+    def test_pool_too_big(self):
+
+        async def go():
+            pool1 = Pool(url="ws://localhost:8182/",
+                         maxsize=2,
+                         username="stephen",
+                         password="password",
+                         future_class=Future)
+            pool2 = Pool(url="ws://localhost:8182/",
+                         username="stephen",
+                         password="password",
+                         future_class=Future)
+            conn1 = await pool1.acquire()
+            conn2 = await pool2.acquire()
+            conn3 = await pool2.acquire()
+            conn4 = await pool2.acquire()
+            pool1.pool.append(conn2)
+            pool1.pool.append(conn3)
+            pool1.pool.append(conn4)
+            pool1.release(conn1)
+            self.assertTrue(conn1.closed)
 
         self.loop.run_sync(go)
 
@@ -445,6 +484,26 @@ class TornadoCnxtMngrTest(unittest.TestCase):
                 self.assertFalse(conn.closed)
 
         self.loop.run_sync(go)
+
+    def test_pool_enter_runtime_error(self):
+        pool = Pool(url="ws://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    future_class=Future)
+        with self.assertRaises(RuntimeError):
+            with pool as conn:
+                self.assertFalse(conn.closed)
+
+    def test_conn_enter_runtime_error(self):
+        graph = GraphDatabase(url="ws://localhost:8182/",
+                                username="stephen",
+                                password="password",
+                                future_class=Future)
+        with self.assertRaises(RuntimeError):
+            with graph as conn:
+                self.assertFalse(conn.closed)
+
 
 class TornadoCallbackStyleTest(unittest.TestCase):
 

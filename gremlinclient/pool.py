@@ -66,7 +66,7 @@ class Pool(object):
         if self._pool:
             conn = self._pool.popleft()
             future.set_result(conn)
-            self.acquired.add(conn)
+            self._acquired.add(conn)
         elif self.size < self.maxsize:
             self._acquiring += 1
             conn_future = self.graph.connect(
@@ -120,9 +120,9 @@ class Pool(object):
                 "context manager should use some variation of yield/yield from")
 
     def __exit__(self, *args):
-        pass
+        pass  # pragma: no cover
 
-    if not PY_33:
+    if not PY_33:  # pragma: no cover
         def __await__(self):
             future = self._future_class()
             future_conn = self.acquire()
@@ -144,7 +144,7 @@ class Pool(object):
             e.args = (result,)
             raise e
 
-    if PY_33:
+    if PY_33:  # pragma: no cover
         exec(textwrap.dedent("""
         def __iter__(self):
             return self.__await__()

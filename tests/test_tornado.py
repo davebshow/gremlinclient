@@ -164,6 +164,36 @@ class TornadoPoolTest(AsyncTestCase):
         self.assertEqual(len(pool._acquired), 0)
 
     @gen_test
+    def test_release_acquire(self):
+        pool = Pool(url="ws://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password")
+        c1 = yield pool.acquire()
+        pool.release(c1)
+        c2 = yield pool.acquire()
+        self.assertEqual(c1, c2)
+
+    @gen_test
+    def test_pool_too_big(self):
+        pool1 = Pool(url="ws://localhost:8182/",
+                     maxsize=2,
+                     username="stephen",
+                     password="password")
+        pool2 = Pool(url="ws://localhost:8182/",
+                     username="stephen",
+                     password="password")
+        conn1 = yield pool1.acquire()
+        conn2 = yield pool2.acquire()
+        conn3 = yield pool2.acquire()
+        conn4 = yield pool2.acquire()
+        pool1.pool.append(conn2)
+        pool1.pool.append(conn3)
+        pool1.pool.append(conn4)
+        pool1.release(conn1)
+        self.assertTrue(conn1.closed)
+
+    @gen_test
     def test_release_closed(self):
         pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
@@ -224,6 +254,7 @@ class TornadoPoolTest(AsyncTestCase):
         self.assertIsNone(c2.conn.protocol)
         self.assertIsNotNone(c1.conn.protocol)
         c1.close()
+        self.assertTrue(pool.closed)
 
     @gen_test
     def test_cancelled(self):
@@ -262,6 +293,26 @@ class TornadoCtxtMngrTest(AsyncTestCase):
                                 password="password")
         with (yield graph) as conn:
             self.assertFalse(conn.closed)
+
+    @gen_test
+    def test_pool_enter_runtime_error(self):
+        pool = Pool(url="ws://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password")
+        with self.assertRaises(RuntimeError):
+            with pool as conn:
+                self.assertFalse(conn.closed)
+
+    @gen_test
+    def test_conn_enter_runtime_error(self):
+        graph = GraphDatabase(url="ws://localhost:8182/",
+                                username="stephen",
+                                password="password")
+        with self.assertRaises(RuntimeError):
+            with graph as conn:
+                self.assertFalse(conn.closed)
+
 
 class TornadoCallbackStyleTest(AsyncTestCase):
 

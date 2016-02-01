@@ -480,7 +480,7 @@ class TrolliusAPITests(unittest.TestCase):
         @trollius.coroutine
         def go():
             conn = yield From(create_connection(
-                url="ws://localhost:8182/", password="password",
+                "ws://localhost:8182/", password="password",
                 username="stephen", loop=self.loop, future_class=Future))
             self.assertIsNotNone(conn.conn.protocol)
             conn.close()
@@ -493,7 +493,7 @@ class TrolliusAPITests(unittest.TestCase):
         @trollius.coroutine
         def go():
             stream = yield From(submit(
-                "1 + 1", url="ws://localhost:8182/",
+                "ws://localhost:8182/", "1 + 1",
                 password="password", username="stephen", loop=self.loop,
                 future_class=Future))
             while True:
@@ -510,10 +510,10 @@ class TrolliusAPITests(unittest.TestCase):
         @trollius.coroutine
         def go():
             with self.assertRaises(RuntimeError):
-                stream = yield From(submit("throw new Exception('error')",
-                                      url="ws://localhost:8182/",
-                                      password="password", username="stephen",
-                                      loop=self.loop, future_class=Future))
+                stream = yield From(submit(
+                    "ws://localhost:8182/", "throw new Exception('error')",
+                    password="password", username="stephen",
+                    loop=self.loop, future_class=Future))
                 yield From(stream.read())
 
         self.loop.run_until_complete(go())

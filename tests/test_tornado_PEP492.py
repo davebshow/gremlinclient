@@ -594,7 +594,7 @@ class TornadoAPITest(unittest.TestCase):
 
         async def go():
             conn = await create_connection(
-                url="ws://localhost:8182/", password="password",
+                "ws://localhost:8182/", password="password",
                 username="stephen", loop=self.loop, future_class=Future)
             self.assertIsNotNone(conn.conn.protocol)
             conn.close()
@@ -606,7 +606,7 @@ class TornadoAPITest(unittest.TestCase):
 
         async def go():
             stream = await submit(
-                "1 + 1", url="ws://localhost:8182/",
+                "ws://localhost:8182/", "1 + 1",
                 password="password", username="stephen", loop=self.loop,
                 future_class=Future)
             while True:
@@ -622,8 +622,8 @@ class TornadoAPITest(unittest.TestCase):
 
         async def go():
             with self.assertRaises(RuntimeError):
-                stream = await submit("throw new Exception('error')",
-                                      url="ws://localhost:8182/",
+                stream = await submit("ws://localhost:8182/",
+                                      "throw new Exception('error')",
                                       password="password", username="stephen",
                                       loop=self.loop, future_class=Future)
                 await stream.read()

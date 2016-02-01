@@ -485,7 +485,7 @@ class AsyncioAPITests(unittest.TestCase):
         @asyncio.coroutine
         def go():
             conn = yield from create_connection(
-                url="ws://localhost:8182/", password="password",
+                "ws://localhost:8182/", password="password",
                 username="stephen", loop=self.loop, future_class=Future)
             self.assertIsNotNone(conn.conn.protocol)
             conn.close()
@@ -498,9 +498,8 @@ class AsyncioAPITests(unittest.TestCase):
         @asyncio.coroutine
         def go():
             stream = yield from submit(
-                "1 + 1", url="ws://localhost:8182/",
-                password="password", username="stephen", loop=self.loop,
-                future_class=Future)
+                "ws://localhost:8182/", "1 + 1", password="password",
+                username="stephen", loop=self.loop, future_class=Future)
             while True:
                 msg = yield from stream.read()
                 if msg is None:
@@ -515,10 +514,12 @@ class AsyncioAPITests(unittest.TestCase):
         @asyncio.coroutine
         def go():
             with self.assertRaises(RuntimeError):
-                stream = yield from submit("throw new Exception('error')",
-                                      url="ws://localhost:8182/",
-                                      password="password", username="stephen",
-                                      loop=self.loop, future_class=Future)
+                stream = yield from submit("ws://localhost:8182/",
+                                           "throw new Exception('error')",
+                                           password="password",
+                                           username="stephen",
+                                           loop=self.loop,
+                                           future_class=Future)
                 yield from stream.read()
 
         self.loop.run_until_complete(go())

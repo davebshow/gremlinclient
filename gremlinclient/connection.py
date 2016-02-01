@@ -13,29 +13,36 @@ Message = collections.namedtuple(
 
 
 class Connection(object):
-    """This class encapsulates a connection to the Gremlin Server using the
-    Tornado websocket client implementation.
-    :param str url: url for Gremlin Server (optional). 'http://localhost:8182/'
-        by default
-    :param loop:
+    """This class encapsulates a connection to the Gremlin Server.
+
+    :param tornado.websocket.WebSocketClientConnection conn: client
+        websocket connection.
     :param str lang: Language of scripts submitted to the server.
         "gremlin-groovy" by default
-    :param str op: Gremlin Server op argument. "eval" by default.
     :param str processor: Gremlin Server processor argument. "" by default.
     :param float timeout: timeout for establishing connection (optional).
         Values ``0`` or ``None`` mean no timeout
-    :param connector: A class that implements the method ``ws_connect``.
-        Usually an instance of ``aiogremlin.connector.GremlinConnector``
+    :param str username: Username for SASL auth
+    :param str password: Password for SASL auth
+    :param loop: If param is ``None``, `tornado.ioloop.IOLoop.current`
+        is used for getting default event loop (optional)
+    :param bool validate_cert: validate ssl certificate. False by default
+    :param bool force_close: force connection to close after read.
+    :param class future_class: Type of Future - asyncio, trollius, or tornado.
+        :py:class: tornado.concurrent.Future by default
+    :param gremlinclient.pool.Pool pool: Connection pool. None by default
+    :param bool force_release: If possible, force release to pool after read.
+    :param str session: Session id (optional). Typically a uuid
     """
     def __init__(self, conn, lang="gremlin-groovy", processor="",
                  timeout=None, username="", password="", loop=None,
-                 validate_cert=False, future_class=None, pool=None,
-                 force_close=False, force_release=False):
+                 validate_cert=False, force_close=False, future_class=None,
+                 pool=None, force_release=False, session=None):
         self._conn = conn
         self._lang = lang
         self._processor = processor
         self._closed = False
-        self._session = None
+        self._session = session
         self._timeout = timeout
         self._username = username
         self._password = password
@@ -46,26 +53,35 @@ class Connection(object):
         self._future_class = future_class or concurrent.Future
 
     def release(self):
+        """Release connection to associated pool."""
         if self._pool:
             self._pool.release(self)
 
     @property
     def conn(self):
+        """Read only property for websocket connection.
+        :returns: :py:class:`tornado.websocket.WebSocketClientConnection`
+        """
         return self._conn
 
     @property
     def closed(self):
-        """Readonly property. Return True if client has been closed"""
+        """Readonly property. Return True if client has been closed
+        :returns: bool
+        """
         return self._closed or self._conn.protocol is None
 
     def close(self):
+        """Close the underlying websocket connection, detach from pool,
+        and set to close.
+        """
         self._conn.close()
         self._closed = True
         self._pool = None
 
     def submit(self, gremlin, bindings=None, lang=None, rebindings=None,
                op="eval", processor=None, session=None,
-               timeout=None, mime_type="application/json"):
+               timeout=None):
         """
         Submit a script to the Gremlin Server.
         :param str gremlin: Gremlin script to submit to server.
@@ -79,10 +95,10 @@ class Connection(object):
         :param float timeout: timeout for establishing connection (optional).
             Values ``0`` or ``None`` mean no timeout
         :param str session: Session id (optional). Typically a uuid
-        :param loop: :ref:`event loop<asyncio-event-loop>` If param is ``None``
-            `asyncio.get_event_loop` is used for getting default event loop
-            (optional)
-        :returns: :py:class:`gremlinclient.client.Stream` object
+        :param loop: If param is ``None``, `tornado.ioloop.IOLoop.current`
+            is used for getting default event loop (optional)
+
+        :returns: :py:class:`gremlinclient.connection.Stream` object
         """
         lang = lang or self._lang
         processor = processor or self._processor
@@ -98,7 +114,7 @@ class Connection(object):
             op=op, processor=processor, session=session)
 
         message = json.dumps(message)
-        message = self._set_message_header(message, mime_type)
+        message = self._set_message_header(message, "application/json")
         self.conn.write_message(message, binary=True)
 
         return Stream(self,
@@ -161,6 +177,9 @@ class Connection(object):
 
 
 class Stream(object):
+    """
+
+    """
 
     def __init__(self, conn, session=None, loop=None, username="",
                  password="", force_close=False,

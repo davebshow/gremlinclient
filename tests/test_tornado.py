@@ -350,7 +350,7 @@ class TornadoAPITests(AsyncTestCase):
     @gen_test
     def test_create_connection(self):
         conn = yield create_connection(
-            url="ws://localhost:8182/", password="password",
+            "ws://localhost:8182/", password="password",
             username="stephen")
         self.assertIsNotNone(conn.conn.protocol)
         conn.close()
@@ -358,8 +358,8 @@ class TornadoAPITests(AsyncTestCase):
     @gen_test
     def test_submit(self):
         stream = yield submit(
-            "1 + 1", url="ws://localhost:8182/",
-            password="password", username="stephen")
+            "ws://localhost:8182/", "1 + 1", password="password",
+            username="stephen")
         while True:
             msg = yield stream.read()
             if msg is None:
@@ -370,9 +370,9 @@ class TornadoAPITests(AsyncTestCase):
     @gen_test(timeout=1)
     def test_script_exception(self):
         with self.assertRaises(RuntimeError):
-            stream = yield submit("throw new Exception('error')",
-                                  url="ws://localhost:8182/",
-                                  password="password", username="stephen")
+            stream = yield submit("ws://localhost:8182/",
+                                  "throw new Exception('error')",
+                                   password="password", username="stephen")
             yield stream.read()
 
 

@@ -13,8 +13,25 @@ PY_35 = sys.version_info >= (3, 5)
 
 
 class Pool(object):
+    """
+    Pool of :py:class:`gremlinclient.connection.Connection` objects.
 
-    def __init__(self, url='ws://localhost:8182/', timeout=None,
+    :param str url: url for Gremlin Server.
+    :param float timeout: timeout for establishing connection (optional).
+        Values ``0`` or ``None`` mean no timeout
+    :param str username: Username for SASL auth
+    :param str password: Password for SASL auth
+    :param gremlinclient.graph.GraphDatabase graph: The graph instances
+        used to create connections
+    :param int maxsize: Maximum number of connections.
+    :param loop: If param is ``None``, `tornado.ioloop.IOLoop.current`
+        is used for getting default event loop (optional)
+    :param bool validate_cert: validate ssl certificate. False by default
+    :param class future_class: type of Future -
+        :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
+        :py:class:`tornado.concurrent.Future`
+    """
+    def __init__(self, url, timeout=None,
                  username="", password="", graph=None, maxsize=256, loop=None,
                  force_release=False, future_class=None):
         self._maxsize = maxsize
@@ -35,30 +52,67 @@ class Pool(object):
 
     @property
     def freesize(self):
+        """
+        Number of free connections
+
+        :returns: int
+        """
         return len(self._pool)
 
     @property
     def size(self):
+        """
+        Total number of connections
+
+        :returns: int
+        """
         return len(self._acquired) + self._acquiring + self.freesize
 
     @property
     def maxsize(self):
+        """
+        Maximum number of connections
+
+        :returns: in
+        """
         return self._maxsize
 
     @property
     def graph(self):
+        """
+        Associated graph instance used for creating connections
+
+        :returns: :py:class:`gremlinclient.graph.GraphDatabase`
+        """
         return self._graph
 
     @property
     def pool(self):
+        """
+        Object that stores unused connections
+
+        :returns: :py:class:`collections.deque`
+        """
         return self._pool
 
     @property
     def closed(self):
+        """
+        Check if pool has been closed
+
+        :returns: bool
+        """
         return self._closed or self._graph is None
 
     def acquire(self):
         # maybe have max connection open time here
+        """
+        Acquire a connection from the Pool
+
+        :returns: Future -
+            :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
+            :py:class:`tornado.concurrent.Future`
+        """
         future = self._future_class()
         if self._pool:
             conn = self._pool.popleft()
@@ -84,6 +138,12 @@ class Pool(object):
         return future
 
     def release(self, conn):
+        """
+        Release a connection back to the pool.
+
+        :param gremlinclient.connection.Connection: The connection to be
+            released
+        """
         if self.size <= self.maxsize:
             if conn.closed:
                 # conn has been closed
@@ -99,6 +159,9 @@ class Pool(object):
             self._acquired.remove(conn)
 
     def close(self):
+        """
+        Close pool
+        """
         while self.pool:
             conn = self.pool.popleft()
             conn.close()
@@ -143,10 +206,8 @@ class Pool(object):
 
     if PY_33:  # pragma: no cover
         exec(textwrap.dedent("""
-        def __iter__(self):
-            return self.__await__()
 
-        def __await__(self):
+        def __iter__(self):
             future = self._future_class()
             future_conn = self.acquire()
 
@@ -162,7 +223,9 @@ class Pool(object):
             future_conn.add_done_callback(on_connect)
             if isinstance(future, concurrent.Future):
                 return (yield future)
-            return (yield from future)"""))
+            return (yield from future)
+
+        __await__ = __iter__"""))
 
     # if PY_35:
     #     exec(textwrap.dedent("""

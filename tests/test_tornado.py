@@ -1,6 +1,6 @@
-from datetime import timedelta
+import uuid
 import unittest
-
+from datetime import timedelta
 import tornado
 from tornado import gen
 from tornado.concurrent import Future
@@ -28,26 +28,27 @@ class TornadoFactoryConnectTest(AsyncTestCase):
 
     @gen_test
     def test_bad_port_exception(self):
-        graph = GraphDatabase(url="ws://localhost:81/")
+        graph = GraphDatabase("ws://localhost:81/")
         with self.assertRaises(RuntimeError):
             connection = yield graph.connect()
 
     @gen_test
     def test_wrong_protocol_exception(self):
-        graph = GraphDatabase(url="wss://localhost:8182/")
+        graph = GraphDatabase("wss://localhost:8182/")
         with self.assertRaises(RuntimeError):
             connection = yield graph.connect()
 
-    @gen_test
-    def test_bad_host_exception(self):
-        graph = GraphDatabase(url="ws://locaost:8182/")
-        with self.assertRaises(RuntimeError):
-            connection = yield graph.connect()
+    # Check this out
+    # @gen_test
+    # def test_bad_host_exception(self):
+    #     graph = GraphDatabase("ws://locaost:8182/")
+    #     with self.assertRaises(RuntimeError):
+    #         connection = yield graph.connect()
 
     @gen_test
-    def test_submit(self):
+    def test_send(self):
         connection = yield self.graph.connect()
-        resp = connection.submit("1 + 1")
+        resp = connection.send("1 + 1")
         while True:
             msg = yield resp.read()
             if msg is None:
@@ -59,7 +60,7 @@ class TornadoFactoryConnectTest(AsyncTestCase):
     @gen_test
     def test_read_one_on_closed(self):
         connection = yield self.graph.connect()
-        resp = connection.submit("1 + 1")
+        resp = connection.send("1 + 1")
         connection.close()
         with self.assertRaises(RuntimeError):
             msg = yield resp.read()
@@ -80,7 +81,7 @@ class TornadoFactoryConnectTest(AsyncTestCase):
     #                             username="stephen",
     #                             password="passwor")
     #     connection = yield graph.connect()
-    #     resp = connection.submit("1 + 1")
+    #     resp = connection.send("1 + 1")
     #     with self.assertRaises(RuntimeError):
     #         msg = yield resp.read()
     #     connection.conn.close()
@@ -88,7 +89,7 @@ class TornadoFactoryConnectTest(AsyncTestCase):
     @gen_test
     def test_force_close(self):
         connection = yield self.graph.connect(force_close=True)
-        resp = connection.submit("1 + 1")
+        resp = connection.send("1 + 1")
         while True:
             msg = yield resp.read()
             if msg is None:
@@ -101,7 +102,7 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_acquire(self):
-        pool = Pool(url="ws://localhost:8182/",
+        pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password")
@@ -121,13 +122,13 @@ class TornadoPoolTest(AsyncTestCase):
         conn2.close()
 
     @gen_test
-    def test_acquire_submit(self):
-        pool = Pool(url="ws://localhost:8182/",
+    def test_acquire_send(self):
+        pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password")
         connection = yield pool.acquire()
-        resp = connection.submit("1 + 1")
+        resp = connection.send("1 + 1")
         while True:
             msg = yield resp.read()
             if msg is None:
@@ -138,7 +139,7 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_maxsize(self):
-        pool = Pool(url="ws://localhost:8182/",
+        pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password")
@@ -153,7 +154,7 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_release(self):
-        pool = Pool(url="ws://localhost:8182/",
+        pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password")
@@ -166,7 +167,7 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_release_acquire(self):
-        pool = Pool(url="ws://localhost:8182/",
+        pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password")
@@ -177,11 +178,11 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_pool_too_big(self):
-        pool1 = Pool(url="ws://localhost:8182/",
+        pool1 = Pool("ws://localhost:8182/",
                      maxsize=2,
                      username="stephen",
                      password="password")
-        pool2 = Pool(url="ws://localhost:8182/",
+        pool2 = Pool("ws://localhost:8182/",
                      username="stephen",
                      password="password")
         conn1 = yield pool1.acquire()
@@ -196,7 +197,7 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_release_closed(self):
-        pool = Pool(url="ws://localhost:8182/",
+        pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password")
@@ -210,7 +211,7 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_self_release(self):
-        pool = Pool(url="ws://localhost:8182/",
+        pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password",
@@ -218,14 +219,14 @@ class TornadoPoolTest(AsyncTestCase):
         self.assertEqual(len(pool.pool), 0)
         c1 = yield pool.acquire()
         self.assertEqual(len(pool._acquired), 1)
-        stream = c1.submit("1 + 1")
+        stream = c1.send("1 + 1")
         resp = yield stream.read()
         self.assertEqual(len(pool.pool), 1)
         self.assertEqual(len(pool._acquired), 0)
 
     @gen_test
     def test_maxsize_release(self):
-        pool = Pool(url="ws://localhost:8182/",
+        pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password")
@@ -244,7 +245,7 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_close(self):
-        pool = Pool(url="ws://localhost:8182/",
+        pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password")
@@ -259,7 +260,7 @@ class TornadoPoolTest(AsyncTestCase):
 
     @gen_test
     def test_cancelled(self):
-        pool = Pool(url="ws://localhost:8182/",
+        pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password")
@@ -277,7 +278,7 @@ class TornadoCtxtMngrTest(AsyncTestCase):
 
     @gen_test
     def test_pool_manager(self):
-        pool = Pool(url="ws://localhost:8182/",
+        pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password")
@@ -289,7 +290,7 @@ class TornadoCtxtMngrTest(AsyncTestCase):
 
     @gen_test
     def test_graph_manager(self):
-        graph = GraphDatabase(url="ws://localhost:8182/",
+        graph = GraphDatabase("ws://localhost:8182/",
                                 username="stephen",
                                 password="password")
         with (yield graph) as conn:
@@ -297,7 +298,7 @@ class TornadoCtxtMngrTest(AsyncTestCase):
 
     @gen_test
     def test_pool_enter_runtime_error(self):
-        pool = Pool(url="ws://localhost:8182/",
+        pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password")
@@ -307,7 +308,7 @@ class TornadoCtxtMngrTest(AsyncTestCase):
 
     @gen_test
     def test_conn_enter_runtime_error(self):
-        graph = GraphDatabase(url="ws://localhost:8182/",
+        graph = GraphDatabase("ws://localhost:8182/",
                                 username="stephen",
                                 password="password")
         with self.assertRaises(RuntimeError):
@@ -319,21 +320,21 @@ class TornadoCallbackStyleTest(AsyncTestCase):
 
     def setUp(self):
         super(TornadoCallbackStyleTest, self).setUp()
-        self.pool = Pool()
+        self.pool = Pool("ws://localhost:8182/")
 
     @gen_test
     def test_data_flow(self):
 
         def execute(script):
             future = Future()
-            graph = GraphDatabase(url="ws://localhost:8182/",
+            graph = GraphDatabase("ws://localhost:8182/",
                                     username="stephen",
                                     password="password")
             future_conn = graph.connect()
 
             def cb(f):
                 conn = f.result()
-                stream = conn.submit(script)
+                stream = conn.send(script)
                 future.set_result(stream)
 
             future_conn.add_done_callback(cb)
@@ -344,6 +345,40 @@ class TornadoCallbackStyleTest(AsyncTestCase):
         self.assertIsInstance(result, Stream)
         resp = yield result.read()
         self.assertEqual(resp.data[0], 2)
+
+
+class TornadoSessionTest(AsyncTestCase):
+
+    def setUp(self):
+        super(TornadoSessionTest, self).setUp()
+        self.graph = GraphDatabase("ws://localhost:8182/",
+                                   username="stephen",
+                                   password="password")
+
+    @gen_test
+    def test_manual_session(self):
+        session = yield self.graph.connect(session=str(uuid.uuid4()))
+        stream = session.send("v = 1+1", processor="session")
+        resp = yield stream.read()
+        stream = session.send("v", processor="session")
+        resp2 = yield stream.read()
+        self.assertEqual(resp.data[0], resp2.data[0])
+        session.close()
+
+    @gen_test
+    def test_no_session(self):
+        session = yield self.graph.connect()
+        with self.assertRaises(RuntimeError):
+            stream = session.send("v = 1+1", processor="session")
+
+    @gen_test
+    def test_session_obj_session(self):
+        session = yield self.graph.session()
+        stream = session.send("v = 1+1")
+        resp = yield stream.read()
+        stream = session.send("v")
+        resp2 = yield stream.read()
+        self.assertEqual(resp.data[0], resp2.data[0])
 
 
 class TornadoAPITests(AsyncTestCase):

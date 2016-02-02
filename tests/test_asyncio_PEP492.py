@@ -1,5 +1,6 @@
 import asyncio
 from asyncio import Future
+import uuid
 import unittest
 
 import tornado
@@ -58,21 +59,21 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
 
-    def test_bad_host_exception(self):
-        graph = GraphDatabase(url="ws://locaost:8182/", loop=self.loop,
-                              future_class=Future)
+    # def test_bad_host_exception(self):
+    #     graph = GraphDatabase(url="ws://locaost:8182/", loop=self.loop,
+    #                           future_class=Future)
+    #
+    #     async def go():
+    #         with self.assertRaises(RuntimeError):
+    #             connection = await graph.connect()
+    #
+    #     self.loop.run_until_complete(go())
 
-        async def go():
-            with self.assertRaises(RuntimeError):
-                connection = await graph.connect()
-
-        self.loop.run_until_complete(go())
-
-    def test_submit(self):
+    def test_send(self):
 
         async def go():
             connection = await self.graph.connect()
-            resp = connection.submit("1 + 1")
+            resp = connection.send("1 + 1")
             while True:
                 msg = await resp.read()
                 if msg is None:
@@ -87,7 +88,7 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
 
         async def go():
             connection = await self.graph.connect()
-            resp = connection.submit("1 + 1")
+            resp = connection.send("1 + 1")
             connection.close()
             with self.assertRaises(RuntimeError):
                 msg = await resp.read()
@@ -117,7 +118,7 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
     #                               loop=self.loop,
     #                               future_class=Future)
     #         connection = await graph.connect()
-    #         resp = connection.submit("1 + 1")
+    #         resp = connection.send("1 + 1")
     #         with self.assertRaises(RuntimeError):
     #             msg = await resp.read()
     #         connection.conn.close()
@@ -128,7 +129,7 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
 
         async def go():
             connection = await self.graph.connect(force_close=True)
-            resp = connection.submit("1 + 1")
+            resp = connection.send("1 + 1")
             while True:
                 msg = await resp.read()
                 if msg is None:
@@ -172,7 +173,7 @@ class AsyncioPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
 
-    def test_acquire_submit(self):
+    def test_acquire_send(self):
         pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
@@ -182,7 +183,7 @@ class AsyncioPoolTest(unittest.TestCase):
 
         async def go():
             connection = await pool.acquire()
-            resp = connection.submit("1 + 1")
+            resp = connection.send("1 + 1")
             while True:
                 msg = await resp.read()
                 if msg is None:
@@ -276,7 +277,7 @@ class AsyncioPoolTest(unittest.TestCase):
             self.assertEqual(len(pool.pool), 0)
             c1 = await pool.acquire()
             self.assertEqual(len(pool._acquired), 1)
-            stream = c1.submit("1 + 1")
+            stream = c1.send("1 + 1")
             resp = await stream.read()
             self.assertEqual(len(pool.pool), 1)
             self.assertEqual(len(pool._acquired), 0)
@@ -456,7 +457,7 @@ class AsyncioCallbackStyleTest(unittest.TestCase):
 
             def cb(f):
                 conn = f.result()
-                stream = conn.submit(script)
+                stream = conn.send(script)
                 future.set_result(stream)
 
             future_conn.add_done_callback(cb)
@@ -468,6 +469,50 @@ class AsyncioCallbackStyleTest(unittest.TestCase):
             self.assertIsInstance(result, Stream)
             resp = await result.read()
             self.assertEqual(resp.data[0], 2)
+
+        self.loop.run_until_complete(go())
+
+
+class AsyncioSessionTest(unittest.TestCase):
+
+    def setUp(self):
+        self.loop = asyncio.get_event_loop()
+        self.graph = GraphDatabase("ws://localhost:8182/",
+                                   username="stephen",
+                                   password="password",
+                                   future_class=Future)
+
+    def test_manual_session(self):
+
+        async def go():
+            session = await self.graph.connect(session=str(uuid.uuid4()))
+            stream = session.send("v = 1+1", processor="session")
+            resp = await stream.read()
+            stream = session.send("v", processor="session")
+            resp2 = await stream.read()
+            self.assertEqual(resp.data[0], resp2.data[0])
+            session.close()
+
+        self.loop.run_until_complete(go())
+
+    def test_no_session(self):
+
+        async def go():
+            session = await self.graph.connect()
+            with self.assertRaises(RuntimeError):
+                stream = session.send("v = 1+1", processor="session")
+
+        self.loop.run_until_complete(go())
+
+    def test_session_obj_session(self):
+
+        async def go():
+            session = await self.graph.session()
+            stream = session.send("v = 1+1")
+            resp = await stream.read()
+            stream = session.send("v")
+            resp2 = await stream.read()
+            self.assertEqual(resp.data[0], resp2.data[0])
 
         self.loop.run_until_complete(go())
 

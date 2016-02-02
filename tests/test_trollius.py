@@ -1,3 +1,4 @@
+import uuid
 import unittest
 
 import trollius
@@ -61,23 +62,23 @@ class TrolliusFactoryConnectTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
 
-    def test_bad_host_exception(self):
-        graph = GraphDatabase(url="ws://locaost:8182/", loop=self.loop,
-                              future_class=Future)
+    # def test_bad_host_exception(self):
+    #     graph = GraphDatabase(url="ws://locaost:8182/", loop=self.loop,
+    #                           future_class=Future)
+    #
+    #     @trollius.coroutine
+    #     def go():
+    #         with self.assertRaises(RuntimeError):
+    #             connection = yield From(graph.connect())
+    #
+    #     self.loop.run_until_complete(go())
 
-        @trollius.coroutine
-        def go():
-            with self.assertRaises(RuntimeError):
-                connection = yield From(graph.connect())
-
-        self.loop.run_until_complete(go())
-
-    def test_submit(self):
+    def test_send(self):
 
         @trollius.coroutine
         def go():
             connection = yield From(self.graph.connect())
-            resp = connection.submit("1 + 1")
+            resp = connection.send("1 + 1")
             while True:
                 msg = yield From(resp.read())
                 if msg is None:
@@ -93,7 +94,7 @@ class TrolliusFactoryConnectTest(unittest.TestCase):
         @trollius.coroutine
         def go():
             connection = yield From(self.graph.connect())
-            resp = connection.submit("1 + 1")
+            resp = connection.send("1 + 1")
             connection.close()
             with self.assertRaises(RuntimeError):
                 msg = yield From(resp.read())
@@ -124,7 +125,7 @@ class TrolliusFactoryConnectTest(unittest.TestCase):
     #                               loop=self.loop,
     #                               future_class=Future)
     #         connection = yield From(graph.connect())
-    #         resp = connection.submit("1 + 1")
+    #         resp = connection.send("1 + 1")
     #         with self.assertRaises(RuntimeError):
     #             msg = yield From(resp.read())
     #         connection.conn.close()
@@ -136,7 +137,7 @@ class TrolliusFactoryConnectTest(unittest.TestCase):
         @trollius.coroutine
         def go():
             connection = yield From(self.graph.connect(force_close=True))
-            resp = connection.submit("1 + 1")
+            resp = connection.send("1 + 1")
             while True:
                 msg = yield From(resp.read())
                 if msg is None:
@@ -181,7 +182,7 @@ class TrolliusPoolTest(unittest.TestCase):
         self.loop.run_until_complete(go())
 
 
-    def test_acquire_submit(self):
+    def test_acquire_send(self):
         pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
@@ -192,7 +193,7 @@ class TrolliusPoolTest(unittest.TestCase):
         @trollius.coroutine
         def go():
             connection = yield From(pool.acquire())
-            resp = connection.submit("1 + 1")
+            resp = connection.send("1 + 1")
             while True:
                 msg = yield From(resp.read())
                 if msg is None:
@@ -290,7 +291,7 @@ class TrolliusPoolTest(unittest.TestCase):
             self.assertEqual(len(pool.pool), 0)
             c1 = yield From(pool.acquire())
             self.assertEqual(len(pool._acquired), 1)
-            stream = c1.submit("1 + 1")
+            stream = c1.send("1 + 1")
             resp = yield From(stream.read())
             self.assertEqual(len(pool.pool), 1)
             self.assertEqual(len(pool._acquired), 0)
@@ -454,7 +455,7 @@ class TrolliusCallbackStyleTest(unittest.TestCase):
 
             def cb(f):
                 conn = f.result()
-                stream = conn.submit(script)
+                stream = conn.send(script)
                 future.set_result(stream)
 
             future_conn.add_done_callback(cb)
@@ -467,6 +468,50 @@ class TrolliusCallbackStyleTest(unittest.TestCase):
             self.assertIsInstance(result, Stream)
             resp = yield From(result.read())
             self.assertEqual(resp.data[0], 2)
+
+        self.loop.run_until_complete(go())
+
+
+class TrolliusSessionTest(unittest.TestCase):
+
+    def setUp(self):
+        self.loop = trollius.get_event_loop()
+        self.graph = GraphDatabase("ws://localhost:8182/",
+                                   username="stephen",
+                                   password="password",
+                                   future_class=Future)
+
+    def test_manual_session(self):
+        @trollius.coroutine
+        def go():
+            session = yield From(self.graph.connect(session=str(uuid.uuid4())))
+            stream = session.send("v = 1+1", processor="session")
+            resp = yield From(stream.read())
+            stream = session.send("v", processor="session")
+            resp2 = yield From(stream.read())
+            self.assertEqual(resp.data[0], resp2.data[0])
+            session.close()
+
+        self.loop.run_until_complete(go())
+
+    def test_no_session(self):
+        @trollius.coroutine
+        def go():
+            session = yield From(self.graph.connect())
+            with self.assertRaises(RuntimeError):
+                stream = session.send("v = 1+1", processor="session")
+
+        self.loop.run_until_complete(go())
+
+    def test_session_obj_session(self):
+        @trollius.coroutine
+        def go():
+            session = yield From(self.graph.session())
+            stream = session.send("v = 1+1")
+            resp = yield From(stream.read())
+            stream = session.send("v")
+            resp2 = yield From(stream.read())
+            self.assertEqual(resp.data[0], resp2.data[0])
 
         self.loop.run_until_complete(go())
 

@@ -7,7 +7,7 @@ from tornado.httpclient import HTTPRequest, HTTPError
 from tornado.ioloop import IOLoop
 from tornado.websocket import websocket_connect
 
-from gremlinclient.connection import Connection
+from gremlinclient.connection import Connection, Session
 
 
 PY_33 = sys.version_info >= (3, 3)
@@ -15,7 +15,20 @@ PY_35 = sys.version_info >= (3, 5)
 
 
 class GraphDatabase(object):
-    """This class generates connections to the Gremlin Server"""
+    """This class generates connections to the Gremlin Server.
+
+    :param str url: url for Gremlin Server.
+    :param float timeout: timeout for establishing connection (optional).
+        Values ``0`` or ``None`` mean no timeout
+    :param str username: Username for SASL auth
+    :param str password: Password for SASL auth
+    :param loop: If param is ``None``, `tornado.ioloop.IOLoop.current`
+        is used for getting default event loop (optional)
+    :param bool validate_cert: validate ssl certificate. False by default
+    :param class future_class: type of Future -
+        :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
+        :py:class:`tornado.concurrent.Future`
+    """
 
     def __init__(self, url, timeout=None, username="", password="",
                  loop=None, validate_cert=False, future_class=None):
@@ -32,6 +45,45 @@ class GraphDatabase(object):
                 force_close=False,
                 force_release=False,
                 pool=None):
+        """
+        Get a connection to the graph database.
+
+        :param str session: Session id (optional). Typically a uuid
+        :param bool force_close: force connection to close after read.
+        :param bool force_release: If possible, force release to pool after
+            read.
+        :param gremlinclient.pool.Pool pool: Associated connection pool.
+
+        :returns: :py:class:`gremlinclient.connection.Connection`
+        """
+        return self._connect(
+            Connection, session, force_close, force_release, pool)
+
+    def session(self,
+                session=None,
+                force_close=False,
+                force_release=False,
+                pool=None):
+        """
+        Get a session connection to the graph database.
+
+        :param str session: Session id (optional). Typically a uuid
+        :param bool force_close: force connection to close after read.
+        :param bool force_release: If possible, force release to pool after
+            read.
+        :param gremlinclient.pool.Pool pool: Associated connection pool.
+
+        :returns: :py:class:`gremlinclient.connection.Session`
+        """
+        return self._connect(
+            Session, session, force_close, force_release, pool)
+
+    def _connect(self,
+                 conn_type,
+                 session,
+                 force_close,
+                 force_release,
+                 pool):
         # Will provide option for user to build own request,
         # implement with SSL tests.
         request = HTTPRequest(self._url, validate_cert=self._validate_cert)
@@ -50,10 +102,11 @@ class GraphDatabase(object):
             except HTTPError as e:
                 future.set_exception(e)
             else:
-                gc = Connection(conn, self._timeout, self._username,
-                                self._password, self._loop, self._validate_cert,
-                                force_close, self._future_class, pool,
-                                force_release, session)
+                gc = conn_type(conn, self._timeout, self._username,
+                               self._password, self._loop,
+                               self._validate_cert, force_close,
+                               self._future_class, pool, force_release,
+                               session)
                 future.set_result(gc)
         future_conn.add_done_callback(get_conn)
         return future
@@ -94,9 +147,6 @@ class GraphDatabase(object):
     if PY_33:  # pragma: no cover
         exec(textwrap.dedent("""
         def __iter__(self):
-            return self.__await__()
-
-        def __await__(self):
             future = self._future_class()
             future_conn = self.connect()
 
@@ -113,7 +163,8 @@ class GraphDatabase(object):
             if isinstance(future, concurrent.Future):
                 return (yield future)
             return (yield from future)
-            """))
+
+        __await__ = __iter__"""))
 
     # if PY_35:
     #     exec(textwrap.dedent("""

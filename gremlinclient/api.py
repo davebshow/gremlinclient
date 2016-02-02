@@ -33,14 +33,15 @@ def submit(url,
     :param float timeout: timeout for establishing connection (optional).
         Values ``0`` or ``None`` mean no timeout
     :param str session: Session id (optional). Typically a uuid
-    :param loop: If param is ``None``, `tornado.ioloop.IOLoop.current`
+    :param loop: If param is ``None``, :py:meth:`tornado.ioloop.IOLoop.current`
         is used for getting default event loop (optional)
     :param str username: Username for SASL auth
     :param str password: Password for SASL auth
     :param bool validate_cert: validate ssl certificate. False by default
-    :param class future_class: type of Future - asyncio, trollius, or tornado.
-        :py:class: tornado.concurrent.Future by default
-    s
+    :param class future_class: type of Future -
+        :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
+        :py:class:`tornado.concurrent.Future`
+
     :returns: :py:class:`gremlinclient.connection.Stream` object:
     """
 
@@ -62,7 +63,7 @@ def submit(url,
         except Exception as e:
             future.set_exception(e)
         else:
-            stream = conn.submit(gremlin, bindings=bindings, lang=lang,
+            stream = conn.send(gremlin, bindings=bindings, lang=lang,
                                  aliases=aliases, op=op, processor=processor,
                                  session=session, timeout=timeout)
             future.set_result(stream)
@@ -83,12 +84,13 @@ def create_connection(url, timeout=None, username="", password="",
         Values ``0`` or ``None`` mean no timeout
     :param str username: Username for SASL auth
     :param str password: Password for SASL auth
-    :param loop: If param is ``None``, `tornado.ioloop.IOLoop.current`
+    :param loop: If param is ``None``, :py:meth:`tornado.ioloop.IOLoop.current`
         is used for getting default event loop (optional)
     :param bool validate_cert: validate ssl certificate. False by default
     :param bool force_close: force connection to close after read.
-    :param class future_class: type of Future - asyncio, trollius, or tornado.
-        :py:class: tornado.concurrent.Future by default
+    :param class future_class: type of Future -
+        :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
+        :py:class:`tornado.concurrent.Future`
     :param str session: Session id (optional). Typically a uuid
     :returns: :py:class:`gremlinclient.connection.Connection` object:
     """

@@ -2,7 +2,7 @@ Using :py:mod:`Gremlinclient`
 =============================
 
 Before you get started, make sure you have the `Gremlin Server`_ up and running.
-All of the following examples use the PEP492 Python 3.5 async/await syntax, but
+All of the following examples use the `PEP492`_ Python 3.5 async/await syntax, but
 they can all be adjusted as shown in :ref:`Getting Started<getting-started>`.
 
 
@@ -99,3 +99,4 @@ For more info, see the :ref:`Client Reference Guide<gremlinclient-client-referen
 
 
 .. _Gremlin Server: http://tinkerpop.incubator.apache.org/
+.. _PEP 492: https://www.python.org/dev/peps/pep-0492/

@@ -19,19 +19,18 @@ The latest release of :py:mod:`gremlinclient` is **0.1.0**.
 Requirements
 ============
 
-:py:mod:`gremlinclient` is built on Tornado and works with most versions of Python:
+:py:mod:`gremlinclient` is built on `Tornado`_ and works with most versions of Python:
 
 - Python 2.7+
 - Tornado 4.1+
 
-:py:mod:`gremlinclient` also supports Asyncio as follows:
+:py:mod:`gremlinclient` also supports `Asyncio`_ as follows:
 
-- Python 3.4+, Python 3.3 and Asyncio, or Python 2.7 and Trollius
-- TinkerPop 3 Gremlin Server 3.1.0
+- Python 3.4+, Python 3.3 and `Asyncio`_, or Python 2.7 and `Trollius`_
 
 Already using `aiohttp`_? Checkout `aiogremlin`_.
 
-Prefer to use the rest interface? Checkout `gremlinrestclient`_.
+Prefer to use the REST interface? Checkout `gremlinrestclient`_.
 
 Installation
 ============
@@ -159,3 +158,4 @@ Indices and tables
 .. _Github: https://github.com/davebshow/gremlinclient/issues
 .. _`aiogremlin`: http://aiogremlin.readthedocs.org/en/latest/
 .. _`gremlinrestclient`: http://gremlinrestclient.readthedocs.org/en/latest/
+.. _`Trollius`: http://trollius.readthedocs.org/

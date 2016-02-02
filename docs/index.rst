@@ -58,7 +58,7 @@ Submit a script to the Gremlin Server with Python 2.7 or 3.3+ using Tornado::
 
     Message(status_code=200, data=[2], message=u'', metadata={})
 
-Submit a script to the Gremlin Server with Python 3.3+ using Asyncio::
+Submit a script to the Gremlin Server with Python 3.3+ (Asyncio)::
 
     >>> import asyncio
     >>> from tornado.platform.asyncio import AsyncIOMainLoop

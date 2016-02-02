@@ -1,5 +1,5 @@
-gremlinclient
-=============
+GremlinClient API
+=================
 
 .. toctree::
    :maxdepth: 2

@@ -1,5 +1,5 @@
-Using gremlinclient
-===================
+Using :py:mod:`Gremlinclient`
+=============================
 
 Before you get started, make sure you have the `Gremlin Server`_ up and running.
 All of the following examples use the PEP492 Python 3.5 async/await syntax, but

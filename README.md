@@ -6,6 +6,8 @@
 
 Multi-platform Python client for the TinkerPop 3 Gremlin Server - Tornado, Asyncio, Trollius
 
+## [Official Documentation](http://gremlinclient.readthedocs.org/en/latest/)
+
 ## Requirements
 
 * Python 2.7, 3.3, 3.4, 3.5
@@ -26,7 +28,7 @@ The following examples assume that you have the Gremlin Server running at port 8
 
 >>> @gen.coroutine
 ... def go():
-...     resp = yield submit("1 + 1")
+...     resp = yield submit("ws://localhost:8182/", "1 + 1")
 ...     while True:
 ...         msg = yield resp.read()
 ...         if msg is None:
@@ -49,7 +51,8 @@ Message(status_code=200, data=[2], message=u'', metadata={})
 
 >>> @trollius.coroutine
 ... def go():
-...     fut = submit("1 + 1", future_class=trollius.Future)
+...     fut = submit(
+...         "ws://localhost:8182/", "1 + 1", future_class=trollius.Future)
 ...     resp = yield trollius.From(fut)
 ...     while True:
 ...         fut_msg = resp.read()
@@ -74,7 +77,8 @@ Message(status_code=200, data=[2], message=u'', metadata={})
 
 >>> @asyncio.coroutine
 ... def go():
-...     resp = yield from submit("1 + 1", future_class=asyncio.Future)
+...     resp = yield from submit(
+...         "ws://localhost:8182/", "1 + 1", future_class=asyncio.Future)
 ...     while True:
 ...         msg = yield from resp.read()
 ...         if msg is None:
@@ -96,7 +100,8 @@ Message(status_code=200, data=[2], message=u'', metadata={})
 >>> loop = asyncio.get_event_loop()
 
 >>> async def go():
-...     resp = await submit("1 + 1", future_class=asyncio.Future)
+...     resp = await submit(
+...         "ws://localhost:8182/", "1 + 1", future_class=asyncio.Future)
 ...     while True:
 ...         msg = await resp.read()
 ...         if msg is None:

@@ -122,7 +122,7 @@ html_theme = 'alabaster'
 # documentation.
 html_theme_options = {
     # 'logo': 'logo.png',
-    'description': 'Async python client for the TP3 Gremlin Server',
+    'description': 'Async Python client for the TP3 Gremlin Server',
     'logo_text_align': 'left',
     'github_user': 'davebshow',
     'github_repo': 'gremlinclient',

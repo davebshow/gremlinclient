@@ -67,7 +67,7 @@ Note that `async with` is not implemented yet in :py:mod:`gremlinclient`
 The :py:class:`Pool` object
 ---------------------------
 
-Reuse websocket connections with :py:class:gremlinclient.pool.Pool::
+Reuse websocket connections with :py:class:`gremlinclient.pool.Pool`::
 
     >>> async def get_conn():
     ...     pool = Pool("ws://localhost:8182/")
@@ -75,7 +75,7 @@ Reuse websocket connections with :py:class:gremlinclient.pool.Pool::
     ...     ...
     ...     pool.release(conn)
 
-Automatically release connections to :py:class:gremlinclient.pool.Pool after read::
+Automatically release connections to :py:class:`gremlinclient.pool.Pool` after read::
 
         >>> async def get_conn():
         ...     pool = Pool("ws://localhost:8182/", force_close=True)

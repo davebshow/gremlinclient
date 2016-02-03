@@ -3,13 +3,10 @@ import sys
 import textwrap
 
 try:
-    import tornado
-    from tornado.concurrent import Future
-    from tornado.ioloop import IOLoop
-except:
+    from tornado import concurrent
+except ImportError:
     pass
 
-from gremlinclient.factory import TornadoFactory
 from gremlinclient.graph import GraphDatabase
 
 
@@ -29,15 +26,14 @@ class Pool(object):
     :param gremlinclient.graph.GraphDatabase graph: The graph instances
         used to create connections
     :param int maxsize: Maximum number of connections.
-    :param loop: If param is ``None``, `tornado.ioloop.IOLoop.current`
-        is used for getting default event loop (optional)
+    :param loop: event loop
     :param bool validate_cert: validate ssl certificate. False by default
     :param class future_class: type of Future -
         :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
         :py:class:`tornado.concurrent.Future`
     """
     def __init__(self, url, timeout=None, username="", password="",
-                 graph=None, factory=None, maxsize=256, loop=None,
+                 graph=None, maxsize=256, loop=None,
                  force_release=False, future_class=None):
         self._maxsize = maxsize
         self._pool = collections.deque()
@@ -45,14 +41,11 @@ class Pool(object):
         self._acquired = set()
         self._acquiring = 0
         self._closed = False
-        self._loop = loop or IOLoop.current()
+        self._loop = loop
         self._force_release = force_release
-        # This may change depending on how other factories are passed
-        self._factory = factory or TornadoFactory
-        self._future_class = (future_class or
-                              self._factory.get_future_class(self._loop))
+        self._future_class = future_class or concurrent.Future
+
         self._graph = graph or GraphDatabase(url,
-                                             factory=self._factory,
                                              timeout=timeout,
                                              username=username,
                                              password=password,
@@ -229,7 +222,7 @@ class Pool(object):
                         _PoolConnectionContextManager(self, conn))
 
             future_conn.add_done_callback(on_connect)
-            if isinstance(future, tornado.concurrent.Future):
+            if isinstance(future, concurrent.Future):
                 return (yield future)
             return (yield from future)
 

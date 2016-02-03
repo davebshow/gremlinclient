@@ -9,7 +9,7 @@ from tornado.websocket import WebSocketClientConnection
 from tornado.ioloop import IOLoop
 
 from gremlinclient import (
-    submit, GraphDatabase, Pool, Stream, create_connection, TornadoResponse)
+    submit, GraphDatabase, Pool, Stream, create_connection, Response)
 
 
 # setUp/tearDown/get_new_ioloop based on:
@@ -160,7 +160,7 @@ class TornadoFactoryConnectTest(unittest.TestCase):
                     break
                 self.assertEqual(msg.status_code, 200)
                 self.assertEqual(msg.data[0], 2)
-            self.assertIsNone(connection.conn.protocol)
+            self.assertTrue(connection.conn.closed)
 
         self.loop.run_sync(go)
 
@@ -204,14 +204,14 @@ class TornadoPoolTest(unittest.TestCase):
         async def go():
             connection = await pool.acquire()
             conn = connection.conn
-            self.assertIsNotNone(conn.protocol)
-            self.assertIsInstance(conn, TornadoResponse)
+            self.assertFalse(conn.closed)
+            self.assertIsInstance(conn, Response)
             self.assertEqual(pool.size, 1)
             self.assertTrue(connection in pool._acquired)
             connection2 = await pool.acquire()
             conn2 = connection.conn
-            self.assertIsNotNone(conn2.protocol)
-            self.assertIsInstance(conn2, TornadoResponse)
+            self.assertFalse(conn2.closed)
+            self.assertIsInstance(conn2, Response)
             self.assertEqual(pool.size, 2)
             self.assertTrue(connection2 in pool._acquired)
             conn.close()
@@ -390,8 +390,8 @@ class TornadoPoolTest(unittest.TestCase):
             c2 = await pool.acquire()
             pool.release(c2)
             pool.close()
-            self.assertIsNone(c2.conn.protocol)
-            self.assertIsNotNone(c1.conn.protocol)
+            self.assertTrue(c2.conn.closed)
+            self.assertFalse(c1.conn.closed)
             c1.close()
 
         self.loop.run_sync(go)
@@ -664,7 +664,7 @@ class TornadoAPITest(unittest.TestCase):
             conn = await create_connection(
                 "ws://localhost:8182/", password="password",
                 username="stephen", loop=self.loop, future_class=Future)
-            self.assertIsNotNone(conn.conn.protocol)
+            self.assertFalse(conn.conn.closed)
             conn.close()
 
         self.loop.run_sync(go)

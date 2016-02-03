@@ -1,4 +1,8 @@
-from gremlinclient.factory import TornadoFactory
+try:
+    from tornado import concurrent
+except ImportError:
+    pass
+
 from gremlinclient.graph import GraphDatabase
 
 
@@ -15,7 +19,6 @@ def submit(url,
            username="",
            password="",
            validate_cert=False,
-           factory=None,
            future_class=None):
     """
     Submit a script to the Gremlin Server.
@@ -43,16 +46,15 @@ def submit(url,
 
     :returns: :py:class:`gremlinclient.connection.Stream` object:
     """
-    factory = factory or TornadoFactory
+    future_class = future_class or concurrent.Future
     graph = GraphDatabase(url,
-                          factory=factory,
                           timeout=timeout,
                           username=username,
                           password=password,
                           loop=loop,
                           validate_cert=validate_cert,
                           future_class=future_class)
-    future_class = future_class or factory.get_future_class(loop)
+
     future = future_class()
     future_conn = graph.connect(force_close=True)
 
@@ -72,7 +74,7 @@ def submit(url,
     return future
 
 
-def create_connection(url, factory=None, timeout=None, username="", password="",
+def create_connection(url, timeout=None, username="", password="",
                       loop=None, validate_cert=False, session=None,
                       force_close=False, future_class=None):
     """
@@ -93,9 +95,8 @@ def create_connection(url, factory=None, timeout=None, username="", password="",
     :param str session: Session id (optional). Typically a uuid
     :returns: :py:class:`gremlinclient.connection.Connection` object:
     """
-    factory = factory or TornadoFactory
+    future_class = future_class or concurrent.Future
     graph = GraphDatabase(url,
-                          factory=factory,
                           timeout=timeout,
                           username=username,
                           password=password,

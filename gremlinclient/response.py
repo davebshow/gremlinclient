@@ -1,12 +1,13 @@
-class TornadoResponse(object):
+class Response(object):
     """
     Wrapper for Tornado websocket client connection.
 
     :param tornado.websocket.WebSocketClientConnection conn: The websocket
         connection
     """
-    def __init__(self, conn, loop=None):
+    def __init__(self, conn, future_class, loop=None):
         self._conn = conn
+        self._future_class = future_class
         self._loop = loop
 
     @property

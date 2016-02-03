@@ -3,13 +3,14 @@ import sys
 import textwrap
 
 try:
-    import tornado
-    from tornado.ioloop import IOLoop
+    from tornado import concurrent
+    from tornado.httpclient import HTTPRequest, HTTPError
+    from tornado.websocket import websocket_connect
 except ImportError:
     pass
 
 from gremlinclient.connection import Connection, Session
-from gremlinclient.factory import TornadoFactory
+from gremlinclient.response import Response
 
 
 PY_33 = sys.version_info >= (3, 3)
@@ -32,17 +33,19 @@ class GraphDatabase(object):
         :py:class:`tornado.concurrent.Future`
     """
 
-    def __init__(self, url, factory=None, timeout=None, username="",
+    def __init__(self, url, timeout=None, username="",
                  password="", loop=None, validate_cert=False,
-                 future_class=None):
+                 future_class=None, conn_class=Connection,
+                 session_class=Session):
         self._url = url
-        self._factory = factory or TornadoFactory
         self._timeout = timeout
         self._username = username
         self._password = password
         self._loop = loop
         self._validate_cert = validate_cert
-        self._future_class = future_class or self._factory.get_future_class(loop)
+        self._future_class = future_class or concurrent.Future
+        self._conn_class = conn_class
+        self._session_class = session_class
 
     def connect(self,
                 session=None,
@@ -61,7 +64,7 @@ class GraphDatabase(object):
         :returns: :py:class:`gremlinclient.connection.Connection`
         """
         return self._connect(
-            Connection, session, force_close, force_release, pool)
+            self._conn_class, session, force_close, force_release, pool)
 
     def session(self,
                 session=None,
@@ -80,7 +83,7 @@ class GraphDatabase(object):
         :returns: :py:class:`gremlinclient.connection.Session`
         """
         return self._connect(
-            Session, session, force_close, force_release, pool)
+            self._session_class, session, force_close, force_release, pool)
 
     def _connect(self,
                  conn_type,
@@ -91,16 +94,25 @@ class GraphDatabase(object):
         # Will provide option for user to build own request,
         # implement with SSL tests.
         future = self._future_class()
-        future_conn = self._factory.ws_connect(
-            self._url, loop=self._loop, validate_cert=self._validate_cert)
+        request = HTTPRequest(self._url, validate_cert=self._validate_cert)
+        future_conn = websocket_connect(request)
 
         def get_conn(f):
             try:
                 conn = f.result()
+            except socket.error:
+                future.set_exception(
+                    RuntimeError("Could not connect to server."))
+            except socket.gaierror:
+                future.set_exception(
+                    RuntimeError("Could not connect to server."))
+            except HTTPError as e:
+                future.set_exception(e)
             except Exception as e:
                 future.set_exception(e)
             else:
-                gc = conn_type(conn, self._future_class, self._timeout,
+                resp = Response(conn, self._future_class, self._loop)
+                gc = conn_type(resp, self._future_class, self._timeout,
                                self._username, self._password, self._loop,
                                self._validate_cert, force_close, pool,
                                force_release, session)
@@ -143,7 +155,6 @@ class GraphDatabase(object):
 
     if PY_33:  # pragma: no cover
         exec(textwrap.dedent("""
-        import tornado
         def __iter__(self):
             future = self._future_class()
             future_conn = self.connect()
@@ -158,7 +169,7 @@ class GraphDatabase(object):
                         _GraphConnectionContextManager(conn))
 
             future_conn.add_done_callback(on_connect)
-            if isinstance(future, tornado.concurrent.Future):
+            if isinstance(future, concurrent.Future):
                 return (yield future)
             return (yield from future)
 

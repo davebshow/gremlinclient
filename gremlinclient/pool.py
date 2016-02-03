@@ -7,8 +7,9 @@ try:
     from tornado.concurrent import Future
     from tornado.ioloop import IOLoop
 except:
-    print("Tornado not available.")
+    pass
 
+from gremlinclient.factory import TornadoFactory
 from gremlinclient.graph import GraphDatabase
 
 
@@ -35,8 +36,8 @@ class Pool(object):
         :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
         :py:class:`tornado.concurrent.Future`
     """
-    def __init__(self, url, timeout=None,
-                 username="", password="", graph=None, maxsize=256, loop=None,
+    def __init__(self, url, timeout=None, username="", password="",
+                 graph=None, factory=None, maxsize=256, loop=None,
                  force_release=False, future_class=None):
         self._maxsize = maxsize
         self._pool = collections.deque()
@@ -46,9 +47,12 @@ class Pool(object):
         self._closed = False
         self._loop = loop or IOLoop.current()
         self._force_release = force_release
-        self._future_class = future_class or Future
         # This may change depending on how other factories are passed
+        self._factory = factory or TornadoFactory
+        self._future_class = (future_class or
+                              self._factory.get_future_class(self._loop))
         self._graph = graph or GraphDatabase(url,
+                                             factory=self._factory,
                                              timeout=timeout,
                                              username=username,
                                              password=password,

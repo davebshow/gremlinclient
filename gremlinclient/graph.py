@@ -4,10 +4,9 @@ import textwrap
 
 try:
     import tornado
-    from tornado.concurrent import Future
     from tornado.ioloop import IOLoop
 except ImportError:
-    print("Tornado not available.")
+    pass
 
 from gremlinclient.connection import Connection, Session
 from gremlinclient.factory import TornadoFactory
@@ -41,9 +40,9 @@ class GraphDatabase(object):
         self._timeout = timeout
         self._username = username
         self._password = password
-        self._loop = loop or IOLoop.current()
+        self._loop = loop
         self._validate_cert = validate_cert
-        self._future_class = future_class or Future
+        self._future_class = future_class or self._factory.get_future_class(loop)
 
     def connect(self,
                 session=None,
@@ -93,7 +92,7 @@ class GraphDatabase(object):
         # implement with SSL tests.
         future = self._future_class()
         future_conn = self._factory.ws_connect(
-            self._url, validate_cert=self._validate_cert)
+            self._url, loop=self._loop, validate_cert=self._validate_cert)
 
         def get_conn(f):
             try:
@@ -101,11 +100,10 @@ class GraphDatabase(object):
             except Exception as e:
                 future.set_exception(e)
             else:
-                gc = conn_type(conn, self._timeout, self._username,
-                               self._password, self._loop,
-                               self._validate_cert, force_close,
-                               self._future_class, pool, force_release,
-                               session)
+                gc = conn_type(conn, self._future_class, self._timeout,
+                               self._username, self._password, self._loop,
+                               self._validate_cert, force_close, pool,
+                               force_release, session)
                 future.set_result(gc)
         future_conn.add_done_callback(get_conn)
         return future
@@ -145,6 +143,7 @@ class GraphDatabase(object):
 
     if PY_33:  # pragma: no cover
         exec(textwrap.dedent("""
+        import tornado
         def __iter__(self):
             future = self._future_class()
             future_conn = self.connect()

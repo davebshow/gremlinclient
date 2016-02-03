@@ -1,13 +1,10 @@
 import base64
 import collections
-import json
 import uuid
-
 try:
-    from tornado.concurrent import Future
-    from tornado.ioloop import IOLoop
+    import ujson as json
 except ImportError:
-    print("Tornado not available.")
+    import json
 
 
 Message = collections.namedtuple(
@@ -38,11 +35,12 @@ class Connection(object):
     :param bool force_release: If possible, force release to pool after read.
     :param str session: Session id (optional). Typically a uuid
     """
-    def __init__(self, conn, timeout=None, username="", password="",
-                 loop=None, validate_cert=False, force_close=False,
-                 future_class=None, pool=None, force_release=False,
+    def __init__(self, conn, future_class, timeout=None, username="",
+                 password="", loop=None, validate_cert=False,
+                 force_close=False, pool=None, force_release=False,
                  session=None):
         self._conn = conn
+        self._future_class = future_class
         self._closed = False
         self._session = session
         self._timeout = timeout
@@ -50,9 +48,8 @@ class Connection(object):
         self._password = password
         self._force_close = force_close
         self._force_release = force_release
-        self._loop = loop or IOLoop.current()
         self._pool = pool
-        self._future_class = future_class or Future
+        self._loop = loop
 
     def release(self):
         """Release connection to associated pool."""
@@ -72,7 +69,7 @@ class Connection(object):
         or client connection has been closed
         :returns: bool
         """
-        return self._closed or self._conn.protocol is None
+        return self._closed or self._conn.closed
 
     def close(self):
         """Close the underlying websocket connection, detach from pool,
@@ -191,8 +188,9 @@ class Session(Connection):
         is used for getting default event loop (optional)
     :param bool validate_cert: validate ssl certificate. False by default
     :param bool force_close: force connection to close after read.
-    :param class future_class: Type of Future - asyncio, trollius, or tornado.
-        :py:class: tornado.concurrent.Future by default
+    :param class future_class: type of Future -
+        :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
+        :py:class:`tornado.concurrent.Future`
     :param gremlinclient.pool.Pool pool: Connection pool. None by default
     :param bool force_release: If possible, force release to pool after read.
     :param str session: Session id (optional). Typically a uuid
@@ -270,7 +268,7 @@ class Stream(object):
         self._password = password
         self._force_close = force_close
         self._force_release = force_release
-        self._loop = loop or IOLoop.current()
+        self._loop = loop
         self._future_class = future_class or Future
 
     def read(self):

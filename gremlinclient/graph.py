@@ -2,12 +2,15 @@ import socket
 import sys
 import textwrap
 
-from tornado import concurrent
-from tornado.httpclient import HTTPRequest, HTTPError
-from tornado.ioloop import IOLoop
-from tornado.websocket import websocket_connect
+try:
+    import tornado
+    from tornado.concurrent import Future
+    from tornado.ioloop import IOLoop
+except ImportError:
+    print("Tornado not available.")
 
 from gremlinclient.connection import Connection, Session
+from gremlinclient.factory import TornadoFactory
 
 
 PY_33 = sys.version_info >= (3, 3)
@@ -30,15 +33,17 @@ class GraphDatabase(object):
         :py:class:`tornado.concurrent.Future`
     """
 
-    def __init__(self, url, timeout=None, username="", password="",
-                 loop=None, validate_cert=False, future_class=None):
+    def __init__(self, url, factory=None, timeout=None, username="",
+                 password="", loop=None, validate_cert=False,
+                 future_class=None):
         self._url = url
+        self._factory = factory or TornadoFactory
         self._timeout = timeout
         self._username = username
         self._password = password
         self._loop = loop or IOLoop.current()
         self._validate_cert = validate_cert
-        self._future_class = future_class or concurrent.Future
+        self._future_class = future_class or Future
 
     def connect(self,
                 session=None,
@@ -86,20 +91,14 @@ class GraphDatabase(object):
                  pool):
         # Will provide option for user to build own request,
         # implement with SSL tests.
-        request = HTTPRequest(self._url, validate_cert=self._validate_cert)
         future = self._future_class()
-        future_conn = websocket_connect(request)
+        future_conn = self._factory.ws_connect(
+            self._url, validate_cert=self._validate_cert)
 
         def get_conn(f):
             try:
                 conn = f.result()
-            except socket.error:
-                future.set_exception(
-                    RuntimeError("Could not connect to server."))
-            except socket.gaierror:
-                future.set_exception(
-                    RuntimeError("Could not connect to server."))
-            except HTTPError as e:
+            except Exception as e:
                 future.set_exception(e)
             else:
                 gc = conn_type(conn, self._timeout, self._username,
@@ -160,7 +159,7 @@ class GraphDatabase(object):
                         _GraphConnectionContextManager(conn))
 
             future_conn.add_done_callback(on_connect)
-            if isinstance(future, concurrent.Future):
+            if isinstance(future, tornado.concurrent.Future):
                 return (yield future)
             return (yield from future)
 

@@ -8,7 +8,7 @@ from tornado.websocket import WebSocketClientConnection
 from tornado.platform.asyncio import AsyncIOMainLoop
 
 from gremlinclient import (
-    submit, GraphDatabase, Pool, Stream, create_connection)
+    submit, GraphDatabase, Pool, Stream, create_connection, TornadoResponse)
 
 
 AsyncIOMainLoop().install()
@@ -29,7 +29,7 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
 
         async def go():
             connection = await self.graph.connect()
-            conn = connection.conn
+            conn = connection.conn._conn
             self.assertIsNotNone(conn.protocol)
             self.assertIsInstance(conn, WebSocketClientConnection)
             conn.close()
@@ -158,13 +158,13 @@ class AsyncioPoolTest(unittest.TestCase):
             connection = await pool.acquire()
             conn = connection.conn
             self.assertIsNotNone(conn.protocol)
-            self.assertIsInstance(conn, WebSocketClientConnection)
+            self.assertIsInstance(conn, TornadoResponse)
             self.assertEqual(pool.size, 1)
             self.assertTrue(connection in pool._acquired)
             connection2 = await pool.acquire()
             conn2 = connection.conn
             self.assertIsNotNone(conn2.protocol)
-            self.assertIsInstance(conn2, WebSocketClientConnection)
+            self.assertIsInstance(conn2, TornadoResponse)
             self.assertEqual(pool.size, 2)
             self.assertTrue(connection2 in pool._acquired)
             conn.close()

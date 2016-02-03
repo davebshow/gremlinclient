@@ -7,7 +7,7 @@ from tornado.concurrent import Future
 from tornado.websocket import WebSocketClientConnection
 from tornado.testing import gen_test, AsyncTestCase
 from gremlinclient import (
-    submit, GraphDatabase, Pool, Stream, create_connection)
+    submit, GraphDatabase, Pool, Stream, create_connection, TornadoResponse)
 
 
 class TornadoFactoryConnectTest(AsyncTestCase):
@@ -15,13 +15,13 @@ class TornadoFactoryConnectTest(AsyncTestCase):
     def setUp(self):
         super(TornadoFactoryConnectTest, self).setUp()
         self.graph = GraphDatabase("ws://localhost:8182/",
-                                      username="stephen",
-                                      password="password")
+                                   username="stephen",
+                                   password="password")
 
     @gen_test
     def test_connect(self):
         connection = yield self.graph.connect()
-        conn = connection.conn
+        conn = connection.conn._conn
         self.assertIsNotNone(conn.protocol)
         self.assertIsInstance(conn, WebSocketClientConnection)
         conn.close()
@@ -109,13 +109,13 @@ class TornadoPoolTest(AsyncTestCase):
         connection = yield pool.acquire()
         conn = connection.conn
         self.assertIsNotNone(conn.protocol)
-        self.assertIsInstance(conn, WebSocketClientConnection)
+        self.assertIsInstance(conn, TornadoResponse)
         self.assertEqual(pool.size, 1)
         self.assertTrue(connection in pool._acquired)
         connection2 = yield pool.acquire()
         conn2 = connection.conn
         self.assertIsNotNone(conn2.protocol)
-        self.assertIsInstance(conn2, WebSocketClientConnection)
+        self.assertIsInstance(conn2, TornadoResponse)
         self.assertEqual(pool.size, 2)
         self.assertTrue(connection2 in pool._acquired)
         conn.close()

@@ -3,8 +3,11 @@ import collections
 import json
 import uuid
 
-from tornado import concurrent
-from tornado.ioloop import IOLoop
+try:
+    from tornado.concurrent import Future
+    from tornado.ioloop import IOLoop
+except ImportError:
+    print("Tornado not available.")
 
 
 Message = collections.namedtuple(
@@ -49,7 +52,7 @@ class Connection(object):
         self._force_release = force_release
         self._loop = loop or IOLoop.current()
         self._pool = pool
-        self._future_class = future_class or concurrent.Future
+        self._future_class = future_class or Future
 
     def release(self):
         """Release connection to associated pool."""
@@ -110,7 +113,7 @@ class Connection(object):
         message = self._prepare_message(
             gremlin, bindings, lang, aliases, op, processor, session)
 
-        self.conn.write_message(message, binary=True)
+        self.conn.send(message, binary=True)
 
         return Stream(self,
                       session,
@@ -150,7 +153,7 @@ class Connection(object):
             }
         }
         message = self._finalize_message(message, processor, session)
-        self.conn.write_message(message, binary=True)
+        self.conn.send(message, binary=True)
 
     def _finalize_message(self, message, processor, session):
         if processor == "session":
@@ -268,7 +271,7 @@ class Stream(object):
         self._force_close = force_close
         self._force_release = force_release
         self._loop = loop or IOLoop.current()
-        self._future_class = future_class or concurrent.Future
+        self._future_class = future_class or Future
 
     def read(self):
         """
@@ -339,5 +342,5 @@ class Stream(object):
                     self._closed = True
                     self._conn = None
 
-        future_resp = self._conn.conn.read_message(callback=parser)
+        future_resp = self._conn.conn.receive(callback=parser)
         return future

@@ -1,5 +1,8 @@
-from tornado import concurrent
-from tornado.ioloop import IOLoop
+try:
+    from tornado.concurrent import Future
+    from tornado.ioloop import IOLoop
+except ImportError:
+    print("Tornado not available.")
 
 from gremlinclient.graph import GraphDatabase
 
@@ -53,7 +56,7 @@ def submit(url,
                           loop=loop,
                           validate_cert=validate_cert,
                           future_class=future_class)
-    future_class = future_class or concurrent.Future
+    future_class = future_class or Future
     future = future_class()
     future_conn = graph.connect(force_close=True)
 

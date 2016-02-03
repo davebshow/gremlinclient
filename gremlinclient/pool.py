@@ -2,8 +2,12 @@ import collections
 import sys
 import textwrap
 
-from tornado import concurrent
-from tornado.ioloop import IOLoop
+try:
+    import tornado
+    from tornado.concurrent import Future
+    from tornado.ioloop import IOLoop
+except:
+    print("Tornado not available.")
 
 from gremlinclient.graph import GraphDatabase
 
@@ -42,7 +46,7 @@ class Pool(object):
         self._closed = False
         self._loop = loop or IOLoop.current()
         self._force_release = force_release
-        self._future_class = future_class or concurrent.Future
+        self._future_class = future_class or Future
         # This may change depending on how other factories are passed
         self._graph = graph or GraphDatabase(url,
                                              timeout=timeout,
@@ -221,7 +225,7 @@ class Pool(object):
                         _PoolConnectionContextManager(self, conn))
 
             future_conn.add_done_callback(on_connect)
-            if isinstance(future, concurrent.Future):
+            if isinstance(future, tornado.concurrent.Future):
                 return (yield future)
             return (yield from future)
 

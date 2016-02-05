@@ -13,8 +13,7 @@ Submit a script with :py:func:`gremlinclient.api.submit`::
 
     >>> async def do_submit():
     ...     resp = await submit(
-    ...         "ws://localhost:8182/", "1 + 1",
-    ...         future_class=asyncio.Future)
+    ...         "ws://localhost:8182/", "1 + 1")
     ...     while True:
     ...         msg = await resp.read()
     ...         print(msg)
@@ -26,8 +25,7 @@ Get a database connection with :py:func:`gremlinclient.api.create_connection`::
     >>> async def get_conn():
     ...     conn = await create_connection("ws://localhost:8182/")
     ...     resp = conn.send(
-    ...         "ws://localhost:8182/", "1 + 1",
-    ...         future_class=asyncio.Future)
+    ...         "ws://localhost:8182/", "1 + 1")
     ...     while True:
     ...         msg = await resp.read()
     ...         if msg is None:
@@ -78,7 +76,7 @@ Reuse websocket connections with :py:class:`gremlinclient.pool.Pool`::
 Automatically release connections to :py:class:`gremlinclient.pool.Pool` after read::
 
         >>> async def get_conn():
-        ...     pool = Pool("ws://localhost:8182/", force_close=True)
+        ...     pool = Pool("ws://localhost:8182/", force_release=True)
         ...     conn = await pool.acquire()
         ...     resp = conn.send("1 + 1")
         ...     while True:

@@ -60,12 +60,24 @@ class TornadoFactoryConnectTest(AsyncTestCase):
     @gen_test
     def test_handler(self):
         connection = yield self.graph.connect()
-        resp = connection.send("1 + 1", handler=lambda x: x.data[0] * 2)
+        resp = connection.send("1 + 1", handler=lambda x: x[0] * 2)
         while True:
             msg = yield resp.read()
             if msg is None:
                 break
             self.assertEqual(msg, 4)
+        connection.conn.close()
+
+    @gen_test
+    def test_add_handler(self):
+        connection = yield self.graph.connect()
+        resp = connection.send("1 + 1", handler=lambda x: x[0] * 2)
+        resp.add_handler(lambda x: x ** 2)
+        while True:
+            msg = yield resp.read()
+            if msg is None:
+                break
+            self.assertEqual(msg, 16)
         connection.conn.close()
 
     @gen_test

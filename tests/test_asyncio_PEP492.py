@@ -88,12 +88,27 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
 
         async def go():
             connection = await self.graph.connect()
-            resp = connection.send("1 + 1", handler=lambda x: x.data[0] * 2)
+            resp = connection.send("1 + 1", handler=lambda x: x[0] * 2)
             while True:
                 msg = await resp.read()
                 if msg is None:
                     break
                 self.assertEqual(msg, 4)
+            connection.conn.close()
+
+        self.loop.run_until_complete(go())
+
+    def test_add_handler(self):
+
+        async def go():
+            connection = await self.graph.connect()
+            resp = connection.send("1 + 1", handler=lambda x: x[0] * 2)
+            resp.add_handler(lambda x: x ** 2)
+            while True:
+                msg = await resp.read()
+                if msg is None:
+                    break
+                self.assertEqual(msg, 16)
             connection.conn.close()
 
         self.loop.run_until_complete(go())

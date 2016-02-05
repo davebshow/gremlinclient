@@ -202,7 +202,7 @@ class Session(Connection):
             self._session = str(uuid.uuid4())
 
     def send(self, gremlin, bindings=None, lang="gremlin-groovy",
-               aliases=None, op="eval", timeout=None):
+             aliases=None, op="eval", timeout=None, handler=None):
         """
         send a script to the Gremlin Server using sessions.
 
@@ -221,13 +221,14 @@ class Session(Connection):
         :returns: :py:class:`gremlinclient.connection.Stream` object
         """
         return super(Session, self).send(gremlin,
-                                           bindings=bindings,
-                                           lang=lang,
-                                           aliases=aliases,
-                                           op=op,
-                                           timeout=timeout,
-                                           processor="session",
-                                           session=self._session)
+                                         bindings=bindings,
+                                         lang=lang,
+                                         aliases=aliases,
+                                         op=op,
+                                         timeout=timeout,
+                                         processor="session",
+                                         session=self._session,
+                                         handler=handler)
 
     def _authenticate(self, username, password):
         super(Session, self)._authenticate(username,
@@ -272,9 +273,13 @@ class Stream(object):
         self._force_release = force_release
         self._loop = loop
         self._future_class = future_class or Future
-        if handler is None:
-            handler = lambda x: x
-        self._handler = handler
+        if handler is not None:
+            handler = [handler]
+        self._handlers = handler
+
+
+    def add_handler(self, handler):
+        self._handlers.append(handler)
 
     def read(self):
         """
@@ -311,10 +316,10 @@ class Stream(object):
                                   message["status"]["message"],
                                   message["result"]["meta"])
                 if message.status_code == 200:
-                    future.set_result(self._handler(message))
+                    future.set_result(self._process(message))
                 elif message.status_code == 206:
                     terminate = False
-                    future.set_result(self._handler(message))
+                    future.set_result(self._process(message))
                 elif message.status_code == 407:
                     terminate = False
                     try:
@@ -334,7 +339,7 @@ class Stream(object):
                                 future.set_result(result)
                         future_read.add_done_callback(cb)
                 elif message.status_code == 204:
-                    future.set_result(self._handler(message))
+                    future.set_result(self._process(message))
                 else:
                     future.set_exception(
                         RuntimeError("{0} {1}".format(
@@ -350,3 +355,10 @@ class Stream(object):
 
         future_resp = self._conn.conn.receive(callback=parser)
         return future
+
+    def _process(self, message):
+        if self._handlers:
+            message = message.data
+            for handler in self._handlers:
+                message = handler(message)
+        return message

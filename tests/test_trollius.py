@@ -89,6 +89,20 @@ class TrolliusFactoryConnectTest(unittest.TestCase):
 
         self.loop.run_until_complete(go())
 
+    def test_handler(self):
+
+        @trollius.coroutine
+        def go():
+            connection = yield From(self.graph.connect())
+            resp = connection.send("1 + 1", handler=lambda x: x.data[0] * 2)
+            while True:
+                msg = yield From(resp.read())
+                if msg is None:
+                    break
+                self.assertEqual(msg, 4)
+            connection.conn.close()
+        self.loop.run_until_complete(go())
+
     def test_read_one_on_closed(self):
 
         @trollius.coroutine
@@ -108,7 +122,7 @@ class TrolliusFactoryConnectTest(unittest.TestCase):
             connection = yield From(self.graph.connect())
             # build connection
             connection.close()
-            stream = Stream(connection, None, "processor", None, "stephen",
+            stream = Stream(connection, None, "processor", None, None, "stephen",
                             "password", False, False, Future)
             with self.assertRaises(RuntimeError):
                 msg = yield From(stream.read())

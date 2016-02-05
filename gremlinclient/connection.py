@@ -81,7 +81,7 @@ class Connection(object):
 
     def send(self, gremlin, bindings=None, lang="gremlin-groovy",
                aliases=None, op="eval", processor="", session=None,
-               timeout=None):
+               timeout=None, handler=None):
         """
         Send a script to the Gremlin Server.
 
@@ -115,6 +115,7 @@ class Connection(object):
         return Stream(self,
                       session,
                       processor,
+                      handler,
                       self._loop,
                       self._username,
                       self._password,
@@ -258,8 +259,9 @@ class Stream(object):
         :py:class:`tornado.concurrent.Future`
     """
 
-    def __init__(self, conn, session, processor, loop, username, password,
-                 force_close, force_release, future_class):
+    def __init__(self, conn, session, processor, handler,
+                 loop, username, password, force_close,
+                 force_release, future_class):
         self._conn = conn
         self._session = session
         self._processor = processor
@@ -270,6 +272,9 @@ class Stream(object):
         self._force_release = force_release
         self._loop = loop
         self._future_class = future_class or Future
+        if handler is None:
+            handler = lambda x: x
+        self._handler = handler
 
     def read(self):
         """
@@ -285,7 +290,10 @@ class Stream(object):
         elif self._conn.closed:
             future.set_exception(RuntimeError("Connection has been closed"))
         else:
-            future = self._read(future)
+            try:
+                future = self._read(future)
+            except Exception as e:
+                future.set_exception(e)
         return future
 
     def _read(self, future):
@@ -303,10 +311,10 @@ class Stream(object):
                                   message["status"]["message"],
                                   message["result"]["meta"])
                 if message.status_code == 200:
-                    future.set_result(message)
+                    future.set_result(self._handler(message))
                 elif message.status_code == 206:
                     terminate = False
-                    future.set_result(message)
+                    future.set_result(self._handler(message))
                 elif message.status_code == 407:
                     terminate = False
                     try:
@@ -326,7 +334,7 @@ class Stream(object):
                                 future.set_result(result)
                         future_read.add_done_callback(cb)
                 elif message.status_code == 204:
-                    future.set_result(message)
+                    future.set_result(self._handler(message))
                 else:
                     future.set_exception(
                         RuntimeError("{0} {1}".format(

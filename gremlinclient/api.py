@@ -13,6 +13,7 @@ def submit(url,
            aliases=None,
            op="eval",
            processor="",
+           graph=None,
            timeout=None,
            session=None,
            loop=None,
@@ -47,13 +48,13 @@ def submit(url,
     :returns: :py:class:`gremlinclient.connection.Stream` object:
     """
     future_class = future_class or concurrent.Future
-    graph = GraphDatabase(url,
-                          timeout=timeout,
-                          username=username,
-                          password=password,
-                          loop=loop,
-                          validate_cert=validate_cert,
-                          future_class=future_class)
+    graph = graph or GraphDatabase(url,
+                                   timeout=timeout,
+                                   username=username,
+                                   password=password,
+                                   loop=loop,
+                                   validate_cert=validate_cert,
+                                   future_class=future_class)
 
     future = future_class()
     future_conn = graph.connect(force_close=True)

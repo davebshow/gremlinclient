@@ -88,6 +88,21 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
 
         self.loop.run_until_complete(go())
 
+    def test_handler(self):
+
+        @asyncio.coroutine
+        def go():
+            connection = yield from self.graph.connect()
+            resp = connection.send("1 + 1", handler=lambda x: x.data[0] * 2)
+            while True:
+                msg = yield from resp.read()
+                if msg is None:
+                    break
+                self.assertEqual(msg, 4)
+            connection.conn.close()
+
+        self.loop.run_until_complete(go())
+
     def test_read_one_on_closed(self):
 
         @asyncio.coroutine
@@ -107,7 +122,7 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
             connection = yield from self.graph.connect()
             # build connection
             connection.close()
-            stream = Stream(connection, None, "processor", None, "stephen",
+            stream = Stream(connection, None, "processor", None, None, "stephen",
                             "password", False, False, Future)
             with self.assertRaises(RuntimeError):
                 msg = yield from stream.read()

@@ -58,6 +58,17 @@ class TornadoFactoryConnectTest(AsyncTestCase):
         connection.conn.close()
 
     @gen_test
+    def test_handler(self):
+        connection = yield self.graph.connect()
+        resp = connection.send("1 + 1", handler=lambda x: x.data[0] * 2)
+        while True:
+            msg = yield resp.read()
+            if msg is None:
+                break
+            self.assertEqual(msg, 4)
+        connection.conn.close()
+
+    @gen_test
     def test_read_one_on_closed(self):
         connection = yield self.graph.connect()
         resp = connection.send("1 + 1")
@@ -70,7 +81,7 @@ class TornadoFactoryConnectTest(AsyncTestCase):
         connection = yield self.graph.connect()
         # build connection
         connection.close()
-        stream = Stream(connection, None, "processor", None, "stephen",
+        stream = Stream(connection, None, "processor", None, None, "stephen",
                         "password", False, False, Future)
         with self.assertRaises(RuntimeError):
             msg = yield stream.read()

@@ -273,10 +273,9 @@ class Stream(object):
         self._force_release = force_release
         self._loop = loop
         self._future_class = future_class or Future
+        self._handlers = []
         if handler is not None:
-            handler = [handler]
-        self._handlers = handler
-
+            self._handlers.append(handler)
 
     def add_handler(self, handler):
         self._handlers.append(handler)

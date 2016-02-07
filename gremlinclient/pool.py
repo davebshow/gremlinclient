@@ -2,8 +2,6 @@ import collections
 import sys
 import textwrap
 
-from threading import Lock
-
 try:
     from tornado import concurrent
 except ImportError:
@@ -46,7 +44,7 @@ class Pool(object):
         self._loop = loop
         self._force_release = force_release
         self._future_class = future_class or concurrent.Future
-        self._lock = Lock()
+
         self._graph = graph or GraphDatabase(url,
                                              timeout=timeout,
                                              username=username,
@@ -116,29 +114,29 @@ class Pool(object):
             :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
             :py:class:`tornado.concurrent.Future`
         """
-        with self._lock:
-            future = self._future_class()
-            if self._pool:
-                conn = self._pool.popleft()
+        future = self._future_class()
+        while self._pool:
+            conn = self._pool.popleft()
+            if not conn.closed:
                 future.set_result(conn)
                 self._acquired.add(conn)
-            elif self.size < self.maxsize:
-                self._acquiring += 1
-                conn_future = self.graph.connect(
-                    force_release=self._force_release, pool=self)
-                def cb(f):
-                    try:
-                        conn = f.result()
-                    except Exception as e:
-                        future.set_exception(e)
-                    else:
-                        self._acquired.add(conn)
-                        future.set_result(conn)
-                    finally:
-                        self._acquiring -= 1
-                conn_future.add_done_callback(cb)
-            else:
-                self._waiters.append(future)
+        if self.size < self.maxsize:
+            self._acquiring += 1
+            conn_future = self.graph.connect(
+                force_release=self._force_release, pool=self)
+            def cb(f):
+                try:
+                    conn = f.result()
+                except Exception as e:
+                    future.set_exception(e)
+                else:
+                    self._acquired.add(conn)
+                    future.set_result(conn)
+                finally:
+                    self._acquiring -= 1
+            conn_future.add_done_callback(cb)
+        else:
+            self._waiters.append(future)
         return future
 
     def release(self, conn):

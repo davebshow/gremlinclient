@@ -314,12 +314,17 @@ class Stream(object):
                                   message["result"]["data"],
                                   message["status"]["message"],
                                   message["result"]["meta"])
-                if message.status_code == 200:
-                    future.set_result(self._process(message))
-                elif message.status_code == 206:
-                    terminate = False
-                    future.set_result(self._process(message))
-                elif message.status_code == 407:
+                status_code = message.status_code
+                if status_code in [200, 206]:
+                    try:
+                        message = self._process(message)
+                    except Exception as e:
+                        future.set_exception(e)
+                    else:
+                        future.set_result(message)
+                        if status_code == 206:
+                            terminate = False
+                elif status_code == 407:
                     terminate = False
                     try:
                         self._conn._authenticate(
@@ -337,7 +342,7 @@ class Stream(object):
                             else:
                                 future.set_result(result)
                         future_read.add_done_callback(cb)
-                elif message.status_code == 204:
+                elif status_code == 204:
                     future.set_result(self._process(message))
                 else:
                     future.set_exception(

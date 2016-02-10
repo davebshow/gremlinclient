@@ -435,5 +435,16 @@ class TornadoAPITests(AsyncTestCase):
             yield stream.read()
 
 
+# class TestDeserialization(AsyncTestCase):
+#
+#     @gen_test
+#     def test_map_deserialization(self):
+#         stream = yield submit("ws://localhost:8182/",
+#                               "[f: 'foo', b: 'bar' ]",
+#                               password="password", username="stephen")
+#         resp = yield stream.read()
+
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -315,7 +315,7 @@ class Stream(object):
                                   message["status"]["message"],
                                   message["result"]["meta"])
                 status_code = message.status_code
-                if status_code in [200, 206]:
+                if status_code in [200, 206, 204]:
                     try:
                         message = self._process(message)
                     except Exception as e:
@@ -342,8 +342,6 @@ class Stream(object):
                             else:
                                 future.set_result(result)
                         future_read.add_done_callback(cb)
-                elif status_code == 204:
-                    future.set_result(self._process(message))
                 else:
                     future.set_exception(
                         RuntimeError("{0} {1}".format(

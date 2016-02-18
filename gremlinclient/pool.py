@@ -2,12 +2,15 @@ import collections
 import sys
 import textwrap
 
+from logging import WARNING
+
 try:
     from tornado import concurrent
 except ImportError:
     pass
 
 from gremlinclient.graph import GraphDatabase
+from gremlinclient.log import pool_logger
 
 
 PY_33 = sys.version_info >= (3, 3)
@@ -34,7 +37,7 @@ class Pool(object):
     """
     def __init__(self, url, timeout=None, username="", password="",
                  graph=None, maxsize=256, loop=None,
-                 force_release=False, future_class=None):
+                 force_release=False, future_class=None, log_level=WARNING):
         self._maxsize = maxsize
         self._pool = collections.deque()
         self._waiters = collections.deque()
@@ -44,12 +47,12 @@ class Pool(object):
         self._loop = loop
         self._force_release = force_release
         self._future_class = future_class or concurrent.Future
-
         self._graph = graph or GraphDatabase(url,
                                              timeout=timeout,
                                              username=username,
                                              password=password,
                                              future_class=future_class)
+        pool_logger.setLevel(log_level)
 
     @property
     def freesize(self):
@@ -118,8 +121,10 @@ class Pool(object):
         while self._pool:
             conn = self._pool.popleft()
             if not conn.closed:
+                pool_logger.debug("Reusing connection: {}".format(conn))
                 future.set_result(conn)
                 self._acquired.add(conn)
+                break
         if self.size < self.maxsize:
             self._acquiring += 1
             conn_future = self.graph.connect(
@@ -130,12 +135,14 @@ class Pool(object):
                 except Exception as e:
                     future.set_exception(e)
                 else:
+                    pool_logger.debug("Got new connection {}".format(conn))
                     self._acquired.add(conn)
                     future.set_result(conn)
                 finally:
                     self._acquiring -= 1
             conn_future.add_done_callback(cb)
         else:
+            pool_logger.debug("Waiting for available conn...")
             self._waiters.append(future)
         return future
 

@@ -1,6 +1,7 @@
 import uuid
 import unittest
 from datetime import timedelta
+from logging import DEBUG
 import tornado
 from tornado import gen
 from tornado.concurrent import Future
@@ -8,6 +9,9 @@ from tornado.websocket import WebSocketClientConnection
 from tornado.testing import gen_test, AsyncTestCase
 from gremlinclient import (
     submit, GraphDatabase, Pool, Stream, create_connection, Response)
+
+
+LOG_LEVEL = DEBUG
 
 
 class TornadoFactoryConnectTest(AsyncTestCase):
@@ -128,7 +132,8 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password")
+                    password="password",
+                    log_level=LOG_LEVEL)
         connection = yield pool.acquire()
         conn = connection.conn
         self.assertFalse(conn.closed)
@@ -136,11 +141,12 @@ class TornadoPoolTest(AsyncTestCase):
         self.assertEqual(pool.size, 1)
         self.assertTrue(connection in pool._acquired)
         connection2 = yield pool.acquire()
-        conn2 = connection.conn
+        conn2 = connection2.conn
         self.assertFalse(conn2.closed)
         self.assertIsInstance(conn2, Response)
         self.assertEqual(pool.size, 2)
         self.assertTrue(connection2 in pool._acquired)
+        self.assertNotEqual(conn, conn2)
         conn.close()
         conn2.close()
 
@@ -149,7 +155,8 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password")
+                    password="password",
+                    log_level=LOG_LEVEL)
         connection = yield pool.acquire()
         resp = connection.send("1 + 1")
         while True:
@@ -165,7 +172,8 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password")
+                    password="password",
+                    log_level=LOG_LEVEL)
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         c3 = pool.acquire()
@@ -180,7 +188,8 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password")
+                    password="password",
+                    log_level=LOG_LEVEL)
         self.assertEqual(len(pool.pool), 0)
         c1 = yield pool.acquire()
         self.assertEqual(len(pool._acquired), 1)
@@ -193,7 +202,8 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password")
+                    password="password",
+                    log_level=LOG_LEVEL)
         c1 = yield pool.acquire()
         pool.release(c1)
         c2 = yield pool.acquire()
@@ -204,10 +214,12 @@ class TornadoPoolTest(AsyncTestCase):
         pool1 = Pool("ws://localhost:8182/",
                      maxsize=2,
                      username="stephen",
-                     password="password")
+                     password="password",
+                     log_level=LOG_LEVEL)
         pool2 = Pool("ws://localhost:8182/",
                      username="stephen",
-                     password="password")
+                     password="password",
+                     log_level=LOG_LEVEL)
         conn1 = yield pool1.acquire()
         conn2 = yield pool2.acquire()
         conn3 = yield pool2.acquire()
@@ -223,7 +235,8 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password")
+                    password="password",
+                    log_level=LOG_LEVEL)
         self.assertEqual(len(pool.pool), 0)
         c1 = yield pool.acquire()
         self.assertEqual(len(pool._acquired), 1)
@@ -238,7 +251,8 @@ class TornadoPoolTest(AsyncTestCase):
                     maxsize=2,
                     username="stephen",
                     password="password",
-                    force_release=True)
+                    force_release=True,
+                    log_level=LOG_LEVEL)
         self.assertEqual(len(pool.pool), 0)
         c1 = yield pool.acquire()
         self.assertEqual(len(pool._acquired), 1)
@@ -252,7 +266,8 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password")
+                    password="password",
+                    log_level=LOG_LEVEL)
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         c3 = pool.acquire()
@@ -271,7 +286,8 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password")
+                    password="password",
+                    log_level=LOG_LEVEL)
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         pool.release(c2)
@@ -435,15 +451,18 @@ class TornadoAPITests(AsyncTestCase):
             yield stream.read()
 
 
-# class TestDeserialization(AsyncTestCase):
-#
-#     @gen_test
-#     def test_map_deserialization(self):
-#         stream = yield submit("ws://localhost:8182/",
-#                               "[f: 'foo', b: 'bar' ]",
-#                               password="password", username="stephen")
-#         resp = yield stream.read()
+class TestDeserialization(AsyncTestCase):
 
+    @gen_test
+    def test_complex_map_bindings(self):
+        stream = yield submit("ws://localhost:8182/",
+                              "x.b",
+                              bindings={"x":{'f': {'foo': 'bar'}, 'b': ['bar', None, 1.5, {'b': 1}]}},
+                              password="password", username="stephen")
+        resp = yield stream.read()
+        self.assertEqual(resp.data[0], 'bar')
+        self.assertIsNone(resp.data[1])
+        self.assertEqual(resp.data[3]['b'], 1)
 
 
 if __name__ == "__main__":

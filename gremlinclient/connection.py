@@ -136,6 +136,7 @@ class Connection(object):
                 "aliases": aliases
             }
         }
+        print(message)
         message = self._finalize_message(message, processor, session)
         return message
 
@@ -310,6 +311,7 @@ class Stream(object):
                 future.set_exception(e)
             else:
                 message = json.loads(result.decode("utf-8"))
+                print(message)
                 message = Message(message["status"]["code"],
                                   message["result"]["data"],
                                   message["status"]["message"],

@@ -118,14 +118,15 @@ class Pool(object):
             :py:class:`tornado.concurrent.Future`
         """
         future = self._future_class()
-        while self._pool:
-            conn = self._pool.popleft()
-            if not conn.closed:
-                pool_logger.debug("Reusing connection: {}".format(conn))
-                future.set_result(conn)
-                self._acquired.add(conn)
-                break
-        if self.size < self.maxsize:
+        if self._pool:
+            while self._pool:
+                conn = self._pool.popleft()
+                if not conn.closed:
+                    pool_logger.debug("Reusing connection: {}".format(conn))
+                    future.set_result(conn)
+                    self._acquired.add(conn)
+                    break
+        elif self.size < self.maxsize:
             self._acquiring += 1
             conn_future = self.graph.connect(
                 force_release=self._force_release, pool=self)

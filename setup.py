@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name="gremlinclient",
-    version="0.1.8",
+    version="0.1.9",
     url="",
     license="MIT",
     author="davebshow",

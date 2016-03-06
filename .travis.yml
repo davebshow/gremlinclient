@@ -49,11 +49,14 @@ script:
   - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then
       coverage run --source=gremlinclient setup.py test -s tests.test_tornado;
       coverage run --source=gremlinclient setup.py test -s tests.test_asyncio;
+    fi
+  - if [[ $TRAVIS_PYTHON_VERSION == '3.4' ]]; then
       coverage run --source=gremlinclient setup.py test -s tests.test_aiohttp;
     fi
   - if [[ $TRAVIS_PYTHON_VERSION == '3.5' ]]; then
       coverage run --source=gremlinclient setup.py test -s tests.test_tornado_PEP492;
       coverage run --source=gremlinclient setup.py test -s tests.test_asyncio_PEP492;
+      coverage run --source=gremlinclient setup.py test -s tests.test_aiohttp;
       coverage run --source=gremlinclient setup.py test -s tests.test_aiohttp_PEP492;
     fi
 

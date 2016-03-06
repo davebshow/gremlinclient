@@ -29,7 +29,7 @@ install:
   - pip install requests_futures
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then pip install trollius; fi
   - if [[ $TRAVIS_PYTHON_VERSION == '3.3' ]]; then pip install asyncio; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then pip install aiohttp; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == '3.4' ]]; then pip install aiohttp; fi
   - docker run -d --name es1 elasticsearch
   - docker run -d --name cas1 elubow/cassandra
   - if [ $CLIENT == socket ]; then

@@ -11,20 +11,37 @@ python:
 services:
   - docker
 
+env:
+  - CLIENT=socket
+
 before_install:
   - docker pull elasticsearch
   - docker pull elubow/cassandra
-  - docker pull davebshow/titan-websockets
+  - if [ $CLIENT == socket ]; then
+      docker pull davebshow/titan-websockets;
+    else
+      docker pull elubow/titan;
+    fi
 
 install:
   - pip install tornado
   - pip install coveralls
-  - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then pip install trollius; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == '3.3' ]]; then pip install asyncio; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then pip install aiohttp; fi
+  - if [ $CLIENT == socket ]; then
+      if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then pip install trollius; fi;
+      if [[ $TRAVIS_PYTHON_VERSION == '3.3' ]]; then pip install asyncio; fi;
+      if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then pip install aiohttp; fi;
+    else
+      pip install requests_futures
+    fi
+
+
   - docker run -d --name es1 elasticsearch
   - docker run -d --name cas1 elubow/cassandra
-  - docker run -d --name titan1 --link es1:elasticsearch --link cas1:cassandra -p 8182:8182 davebshow/titan-websockets
+  - if [ $CLIENT == socket ]; then
+      docker run -d --name titan1 --link es1:elasticsearch --link cas1:cassandra -p 8182:8182 davebshow/titan-websockets;
+    else
+      docker run -d --name titan1 --link es1:elasticsearch --link cas1:cassandra -p 8182:8182 elubow/titan;
+    fi
 
 before_script:
   - sleep 30

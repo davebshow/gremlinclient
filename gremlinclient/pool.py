@@ -120,6 +120,9 @@ class Pool(object):
                     future.set_result(conn)
                     self._acquired.add(conn)
                     break
+                else:
+                    pool_logger.debug(
+                        "Discarded closed connection: {}".format(conn))
         elif self.size < self.maxsize:
             self._acquiring += 1
             conn_future = self.graph.connect(

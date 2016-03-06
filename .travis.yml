@@ -27,9 +27,9 @@ install:
   - pip install tornado
   - pip install coveralls
   - if [ $CLIENT == socket ]; then
-      if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then pip install trollius; fi;
-      if [[ $TRAVIS_PYTHON_VERSION == '3.3' ]]; then pip install asyncio; fi;
-      if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then pip install aiohttp; fi;
+      if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then pip install trollius; fi
+      if [[ $TRAVIS_PYTHON_VERSION == '3.3' ]]; then pip install asyncio; fi
+      if [[ $TRAVIS_PYTHON_VERSION == 3* ]]; then pip install aiohttp; fi
     else
       pip install requests_futures
     fi

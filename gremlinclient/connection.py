@@ -47,14 +47,16 @@ class Connection(object):
         self._username = username
         self._password = password
         self._force_close = force_close
-        self._force_release = force_release
         self._pool = pool
         self._loop = loop
+        if not self._pool:
+            force_release = False
+        self._force_release = force_release
 
     def release(self):
         """Release connection to associated pool."""
         if self._pool:
-            self._pool.release(self)
+            return self._pool.release(self)
 
     @property
     def conn(self):
@@ -75,9 +77,9 @@ class Connection(object):
         """Close the underlying websocket connection, detach from pool,
         and set to close.
         """
-        self._conn.close()
         self._closed = True
         self._pool = None
+        return self._conn.close()
 
     def send(self, gremlin, bindings=None, lang="gremlin-groovy",
                aliases=None, op="eval", processor="", session=None,
@@ -319,11 +321,32 @@ class Stream(object):
                     try:
                         message = self._process(message)
                     except Exception as e:
-                        future.set_exception(e)
+                        if self._force_close:
+                            # This is a bit of a hack. What if close
+                            # throws error asyncio.Cancelled ...
+                            future_close = self._conn.close()
+                            future_close.add_done_callback(
+                                lambda f: future.set_exception(e))
+                        elif self._force_release:
+                            future_release = self._conn.release()
+                            future_release.add_done_callback(
+                                lambda f: future.set_exception(e))
+                        else:
+                            future.set_exception(e)
                     else:
-                        future.set_result(message)
                         if status_code == 206:
                             terminate = False
+                            future.set_result(message)
+                        elif self._force_close:
+                            future_close = self._conn.close()
+                            future_close.add_done_callback(
+                                lambda f: future.set_result(message))
+                        elif self._force_release:
+                            future_release = self._conn.release()
+                            future_release.add_done_callback(
+                                lambda f: future.set_result(message))
+                        else:
+                            future.set_result(message)
                 elif status_code == 407:
                     terminate = False
                     try:
@@ -342,16 +365,24 @@ class Stream(object):
                             else:
                                 future.set_result(result)
                         future_read.add_done_callback(cb)
+                elif self._force_close:
+                    future_close = self._conn.close()
+                    future_close.add_done_callback(
+                        lambda f: future.set_exception(
+                            RuntimeError("{0} {1}".format(
+                                message.status_code, message.message))))
+                elif self._force_release:
+                    future_release = self._conn.release()
+                    future_release.add_done_callback(
+                        lambda f: future.set_exception(
+                            RuntimeError("{0} {1}".format(
+                                message.status_code, message.message))))
                 else:
                     future.set_exception(
                         RuntimeError("{0} {1}".format(
                             message.status_code, message.message)))
             finally:
                 if terminate:
-                    if  self._force_close:
-                        self._conn.close()
-                    if self._force_release:
-                        self._conn.release()
                     self._closed = True
                     self._conn = None
 

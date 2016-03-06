@@ -1,74 +1,68 @@
 import asyncio
-from asyncio import Future
 import uuid
 import unittest
 
-import tornado
-from tornado.websocket import WebSocketClientConnection
-from tornado.platform.asyncio import AsyncIOMainLoop
+import aiohttp
 
-from gremlinclient.connection import Stream
-from gremlinclient.tornado import (
-    submit, GraphDatabase, Pool, create_connection, Response)
+from gremlinclient import Stream
+from gremlinclient.aiohttp import (
+    GraphDatabase, Pool, Response, submit, create_connection)
 
-
-AsyncIOMainLoop().install()
 
 
 class AsyncioFactoryConnectTest(unittest.TestCase):
 
     def setUp(self):
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(None)
         self.graph = GraphDatabase("ws://localhost:8182/",
                                    username="stephen",
                                    password="password",
-                                   loop=self.loop,
-                                   future_class=Future)
+                                   loop=self.loop)
 
+    def tearDown(self):
+        self.loop.close()
 
     def test_connect(self):
 
         async def go():
             connection = await self.graph.connect()
-            conn = connection.conn._conn
-            self.assertIsNotNone(conn.protocol)
-            self.assertIsInstance(conn, WebSocketClientConnection)
-            conn.close()
+            conn = connection.conn
+            self.assertFalse(conn.closed)
+            self.assertIsInstance(
+                conn._conn, aiohttp.websocket_client.ClientWebSocketResponse)
+            await connection.close()
 
         self.loop.run_until_complete(go())
 
-
     def test_bad_port_exception(self):
-        graph = GraphDatabase(url="ws://localhost:81/", loop=self.loop,
-                              future_class=Future)
+        graph = GraphDatabase(url="ws://localhost:81/", loop=self.loop)
 
         async def go():
-            with self.assertRaises(RuntimeError):
+            # Need to fix all these errors
+            with self.assertRaises(aiohttp.errors.ClientOSError):
                 connection = await graph.connect()
 
         self.loop.run_until_complete(go())
 
 
     def test_wrong_protocol_exception(self):
-        graph = GraphDatabase(url="wss://localhost:8182/", loop=self.loop,
-                              future_class=Future)
+        graph = GraphDatabase(url="wss://localhost:8182/", loop=self.loop)
 
         async def go():
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(aiohttp.errors.ClientOSError):
                 connection = await graph.connect()
 
         self.loop.run_until_complete(go())
 
+    def test_bad_host_exception(self):
+        graph = GraphDatabase(url="ws://locaost:8182/", loop=self.loop)
 
-    # def test_bad_host_exception(self):
-    #     graph = GraphDatabase(url="ws://locaost:8182/", loop=self.loop,
-    #                           future_class=Future)
-    #
-    #     async def go():
-    #         with self.assertRaises(RuntimeError):
-    #             connection = await graph.connect()
-    #
-    #     self.loop.run_until_complete(go())
+        async def go():
+            with self.assertRaises(aiohttp.errors.ClientOSError):
+                connection = await graph.connect()
+
+        self.loop.run_until_complete(go())
 
     def test_send(self):
 
@@ -81,36 +75,7 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
                     break
                 self.assertEqual(msg.status_code, 200)
                 self.assertEqual(msg.data[0], 2)
-            connection.conn.close()
-
-        self.loop.run_until_complete(go())
-
-    def test_handler(self):
-
-        async def go():
-            connection = await self.graph.connect()
-            resp = connection.send("1 + 1", handler=lambda x: x[0] * 2)
-            while True:
-                msg = await resp.read()
-                if msg is None:
-                    break
-                self.assertEqual(msg, 4)
-            connection.conn.close()
-
-        self.loop.run_until_complete(go())
-
-    def test_add_handler(self):
-
-        async def go():
-            connection = await self.graph.connect()
-            resp = connection.send("1 + 1", handler=lambda x: x[0] * 2)
-            resp.add_handler(lambda x: x ** 2)
-            while True:
-                msg = await resp.read()
-                if msg is None:
-                    break
-                self.assertEqual(msg, 16)
-            connection.conn.close()
+            await connection.close()
 
         self.loop.run_until_complete(go())
 
@@ -119,10 +84,9 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
         async def go():
             connection = await self.graph.connect()
             resp = connection.send("1 + 1")
-            connection.close()
+            await connection.close()
             with self.assertRaises(RuntimeError):
                 msg = await resp.read()
-
         self.loop.run_until_complete(go())
 
     def test_null_read_on_closed(self):
@@ -130,31 +94,32 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
         async def go():
             connection = await self.graph.connect()
             # build connection
-            connection.close()
-            stream = Stream(connection, None, "processor", None, None, "stephen",
-                            "password", False, False, Future)
+            await connection.close()
+            stream = Stream(connection, None, "processor", None, self.loop,
+                            "stephen", "password", False, False,
+                            asyncio.Future)
             with self.assertRaises(RuntimeError):
                 msg = await stream.read()
 
         self.loop.run_until_complete(go())
-
-    # def test_creditials_error(self):
-    #
-    #
-    #     async def go():
-    #         graph = GraphDatabase("ws://localhost:8182/",
-    #                               username="stephen",
-    #                               password="passwor",
-    #                               loop=self.loop,
-    #                               future_class=Future)
-    #         connection = await graph.connect()
-    #         resp = connection.send("1 + 1")
-    #         with self.assertRaises(RuntimeError):
-    #             msg = await resp.read()
-    #         connection.conn.close()
-    #
-    #     self.loop.run_until_complete(go())
-
+#     #
+#     # def test_creditials_error(self):
+#     #
+#     #     @asyncio.coroutine
+#     #     async def go():
+#     #         graph = GraphDatabase("ws://localhost:8182/",
+#     #                               username="stephen",
+#     #                               password="passwor",
+#     #                               loop=self.loop,
+#     #                               future_class=Future)
+#     #         connection = await graph.connect()
+#     #         resp = connection.send("1 + 1")
+#     #         with self.assertRaises(RuntimeError):
+#     #             msg = await resp.read()
+#     #         connection.conn.close()
+#     #
+#     #     self.loop.run_until_complete(go())
+# #
     def test_force_close(self):
 
         async def go():
@@ -169,20 +134,23 @@ class AsyncioFactoryConnectTest(unittest.TestCase):
             self.assertTrue(connection.conn.closed)
 
         self.loop.run_until_complete(go())
-
-
+# #
+# #
 class AsyncioPoolTest(unittest.TestCase):
 
     def setUp(self):
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(None)
+
+    def tearDown(self):
+        self.loop.close()
 
     def test_acquire(self):
         pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password",
-                    loop=self.loop,
-                    future_class=Future)
+                    loop=self.loop)
 
         async def go():
             connection = await pool.acquire()
@@ -192,24 +160,22 @@ class AsyncioPoolTest(unittest.TestCase):
             self.assertEqual(pool.size, 1)
             self.assertTrue(connection in pool._acquired)
             connection2 = await pool.acquire()
-            conn2 = connection.conn
+            conn2 = connection2.conn
             self.assertFalse(conn2.closed)
             self.assertIsInstance(conn2, Response)
             self.assertEqual(pool.size, 2)
             self.assertTrue(connection2 in pool._acquired)
-            conn.close()
-            conn2.close()
+            await connection.close()
+            await connection2.close()
 
         self.loop.run_until_complete(go())
-
 
     def test_acquire_send(self):
         pool = Pool(url="ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
                     password="password",
-                    loop=self.loop,
-                    future_class=Future)
+                    loop=self.loop)
 
         async def go():
             connection = await pool.acquire()
@@ -220,7 +186,7 @@ class AsyncioPoolTest(unittest.TestCase):
                     break
                 self.assertEqual(msg.status_code, 200)
                 self.assertEqual(msg.data[0], 2)
-            connection.conn.close()
+            await connection.close()
 
         self.loop.run_until_complete(go())
 
@@ -229,18 +195,17 @@ class AsyncioPoolTest(unittest.TestCase):
                     maxsize=2,
                     username="stephen",
                     password="password",
-                    loop=self.loop,
-                    future_class=Future)
+                    loop=self.loop)
 
         async def go():
             c1 = await pool.acquire()
             c2 = await pool.acquire()
             c3 = pool.acquire()
-            self.assertIsInstance(c3, Future)
+            self.assertIsInstance(c3, asyncio.Future)
             with self.assertRaises(asyncio.TimeoutError):
-                await asyncio.wait_for(c3, 0.1)
-            c1.conn.close()
-            c2.conn.close()
+                await asyncio.wait_for(c3, 0.1, loop=self.loop)
+            await c1.close()
+            await c2.close()
 
         self.loop.run_until_complete(go())
 
@@ -249,8 +214,7 @@ class AsyncioPoolTest(unittest.TestCase):
                     maxsize=2,
                     username="stephen",
                     password="password",
-                    loop=self.loop,
-                    future_class=Future)
+                    loop=self.loop)
 
         async def go():
             self.assertEqual(len(pool.pool), 0)
@@ -259,7 +223,7 @@ class AsyncioPoolTest(unittest.TestCase):
             await pool.release(c1)
             self.assertEqual(len(pool.pool), 1)
             self.assertEqual(len(pool._acquired), 0)
-
+            await c1.close()
         self.loop.run_until_complete(go())
 
     def test_release_acquire(self):
@@ -267,13 +231,14 @@ class AsyncioPoolTest(unittest.TestCase):
                     maxsize=2,
                     username="stephen",
                     password="password",
-                    future_class=Future)
+                    loop=self.loop)
 
         async def go():
             c1 = await pool.acquire()
             await pool.release(c1)
             c2 = await pool.acquire()
             self.assertEqual(c1, c2)
+            await c2.close()
 
         self.loop.run_until_complete(go())
 
@@ -282,16 +247,17 @@ class AsyncioPoolTest(unittest.TestCase):
                     maxsize=2,
                     username="stephen",
                     password="password",
-                    future_class=Future)
+                    loop=self.loop)
         self.assertEqual(len(pool.pool), 0)
 
         async def go():
             c1 = await pool.acquire()
             self.assertEqual(len(pool._acquired), 1)
-            c1.close()
+            await c1.close()
             await pool.release(c1)
             self.assertEqual(len(pool.pool), 0)
             self.assertEqual(len(pool._acquired), 0)
+            await c1.close()
         self.loop.run_until_complete(go())
 
     def test_self_release(self):
@@ -300,7 +266,6 @@ class AsyncioPoolTest(unittest.TestCase):
                     username="stephen",
                     password="password",
                     force_release=True,
-                    future_class=Future,
                     loop=self.loop)
 
         async def go():
@@ -311,32 +276,38 @@ class AsyncioPoolTest(unittest.TestCase):
             resp = await stream.read()
             self.assertEqual(len(pool.pool), 1)
             self.assertEqual(len(pool._acquired), 0)
+            await c1.close()
 
         self.loop.run_until_complete(go())
 
-    def test_maxsize_release(self):
-        pool = Pool(url="ws://localhost:8182/",
-                    maxsize=2,
-                    username="stephen",
-                    password="password",
-                    future_class=Future)
-
-        async def go():
-            c1 = await pool.acquire()
-            c2 = await pool.acquire()
-            c3 = pool.acquire()
-            self.assertIsInstance(c3, Future)
-            with self.assertRaises(asyncio.TimeoutError):
-                shielded_fut = asyncio.shield(c3)
-                await asyncio.wait_for(shielded_fut, 0.1)
-            await pool.release(c2)
-            c3 = await c3
-            self.assertEqual(c2, c3)
-            c1.conn.close()
-            c2.conn.close()
-            c3.conn.close()
-
-        self.loop.run_until_complete(go())
+    # def test_maxsize_release(self):
+    #     pool = Pool(url="ws://localhost:8182/",
+    #                 maxsize=2,
+    #                 username="stephen",
+    #                 password="password",
+    #                 loop=self.loop)
+    #
+    #     @asyncio.coroutine
+    #     async def go():
+    #         c1 = await pool.acquire()
+    #         c2 = await pool.acquire()
+    #         c3 = pool.acquire()
+    #         self.assertIsInstance(c3, asyncio.Future)
+    #         # shielded_fut = asyncio.shield(c3, loop=self.loop)
+    #         # try:
+    #         #     await asyncio.wait_for(shielded_fut, 0.1, loop=self.loop)
+    #         #     error = False
+    #         # except:
+    #         #     error = True
+    #         # self.assertTrue(error)
+    #         await pool.release(c2)
+    #         c3 = await c3
+    #         self.assertEqual(c2, c3)
+    #         await c1.close()
+    #         await c2.close()
+    #         await c3.close()
+    #
+    #     self.loop.run_until_complete(go())
 
     def test_pool_too_big(self):
 
@@ -345,11 +316,11 @@ class AsyncioPoolTest(unittest.TestCase):
                          maxsize=2,
                          username="stephen",
                          password="password",
-                         future_class=Future)
+                         loop=self.loop)
             pool2 = Pool(url="ws://localhost:8182/",
                          username="stephen",
                          password="password",
-                         future_class=Future)
+                         loop=self.loop)
             conn1 = await pool1.acquire()
             conn2 = await pool2.acquire()
             conn3 = await pool2.acquire()
@@ -359,6 +330,8 @@ class AsyncioPoolTest(unittest.TestCase):
             pool1.pool.append(conn4)
             await pool1.release(conn1)
             self.assertTrue(conn1.closed)
+            await conn1.close()
+            await pool1.close()
 
         self.loop.run_until_complete(go())
 
@@ -367,16 +340,16 @@ class AsyncioPoolTest(unittest.TestCase):
                     maxsize=2,
                     username="stephen",
                     password="password",
-                    future_class=Future)
+                    loop=self.loop)
 
         async def go():
             c1 = await pool.acquire()
             c2 = await pool.acquire()
             await pool.release(c2)
-            pool.close()
+            await pool.close()
             self.assertTrue(c2.conn.closed)
             self.assertFalse(c1.conn.closed)
-            c1.close()
+            await c1.close()
 
         self.loop.run_until_complete(go())
 
@@ -385,16 +358,16 @@ class AsyncioPoolTest(unittest.TestCase):
                     maxsize=2,
                     username="stephen",
                     password="password",
-                    future_class=Future)
+                    loop=self.loop)
 
         async def go():
             c1 = await pool.acquire()
             c2 = await pool.acquire()
             c3 = pool.acquire()
-            pool.close()
+            await pool.close()
             self.assertTrue(c3.cancelled())
-            c1.close()
-            c2.close()
+            await c1.close()
+            await c2.close()
 
         self.loop.run_until_complete(go())
 
@@ -408,82 +381,70 @@ class AsyncioPoolTest(unittest.TestCase):
 #                     maxsize=2,
 #                     username="stephen",
 #                     password="password",
-#                     loop=self.loop,
-#                     future_class=Future)
+#                     loop=self.loop)
+#
 #
 #         async def go():
-#             with await pool as conn:
+#             with (await pool) as conn:
 #                 self.assertFalse(conn.closed)
 #             self.assertEqual(len(pool.pool), 1)
 #             self.assertEqual(len(pool._acquired), 0)
-#             pool.close()
+#             await pool.close()
 #
 #         self.loop.run_until_complete(go())
-#
-#     # def test_pool_manager_async_with(self):
-    #     pool = Pool(url="ws://localhost:8182/",
-    #                 maxsize=2,
-    #                 username="stephen",
-    #                 password="password",
-    #                 loop=self.loop,
-    #                 future_class=Future)
-    #
-    #     async def go():
-    #         async with pool as conn:
-    #             self.assertFalse(conn.closed)
-    #         self.assertEqual(len(pool.pool), 1)
-    #         self.assertEqual(len(pool._acquired), 0)
-    #         pool.close()
-    #     self.loop.run_until_complete(go())
-
-    # def test_graph_manager(self):
-    #     graph = GraphDatabase(url="ws://localhost:8182/",
-    #                           username="stephen",
-    #                           password="password",
-    #                           loop=self.loop,
-    #                           future_class=Future)
-    #
-    #     async def go():
-    #         with await graph as conn:
-    #             self.assertFalse(conn.closed)
-    #
-    #     self.loop.run_until_complete(go())
-    #
-    # def test_pool_enter_runtime_error(self):
-    #     pool = Pool(url="ws://localhost:8182/",
-    #                 maxsize=2,
-    #                 username="stephen",
-    #                 password="password",
-    #                 future_class=Future)
-    #     with self.assertRaises(RuntimeError):
-    #         with pool as conn:
-    #             self.assertFalse(conn.closed)
-    #
-    # def test_conn_enter_runtime_error(self):
-    #     graph = GraphDatabase(url="ws://localhost:8182/",
-    #                             username="stephen",
-    #                             password="password",
-    #                             future_class=Future)
-    #     with self.assertRaises(RuntimeError):
-    #         with graph as conn:
-    #             self.assertFalse(conn.closed)
+# #
+# #     def test_graph_manager(self):
+# #         graph = GraphDatabase(url="ws://localhost:8182/",
+# #                               username="stephen",
+# #                               password="password",
+# #                               loop=self.loop,
+# #                               future_class=Future)
+# #
+# #
+# #         async def go():
+# #             with (await graph) as conn:
+# #                 self.assertFalse(conn.closed)
+# #
+# #         self.loop.run_until_complete(go())
+# #
+# #     def test_pool_enter_runtime_error(self):
+# #         pool = Pool(url="ws://localhost:8182/",
+# #                     maxsize=2,
+# #                     username="stephen",
+# #                     password="password",
+# #                     future_class=Future)
+# #         with self.assertRaises(RuntimeError):
+# #             with pool as conn:
+# #                 self.assertFalse(conn.closed)
+# #
+# #     def test_conn_enter_runtime_error(self):
+# #         graph = GraphDatabase(url="ws://localhost:8182/",
+# #                                 username="stephen",
+# #                                 password="password",
+# #                                 future_class=Future)
+# #         with self.assertRaises(RuntimeError):
+# #             with graph as conn:
+# #                 self.assertFalse(conn.closed)
 
 
 class AsyncioCallbackStyleTest(unittest.TestCase):
 
     def setUp(self):
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(None)
+
+    def tearDown(self):
+        self.loop.close()
 
     def test_data_flow(self):
 
         def execute(script):
-            future = Future()
+            future = asyncio.Future(loop=self.loop)
             graph = GraphDatabase(url="ws://localhost:8182/",
                                   username="stephen",
                                   password="password",
-                                  loop=self.loop,
-                                  future_class=Future)
-            future_conn = graph.connect()
+                                  loop=self.loop)
+            future_conn = graph.connect(force_close=True)
 
             def cb(f):
                 conn = f.result()
@@ -506,11 +467,15 @@ class AsyncioCallbackStyleTest(unittest.TestCase):
 class AsyncioSessionTest(unittest.TestCase):
 
     def setUp(self):
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(None)
         self.graph = GraphDatabase("ws://localhost:8182/",
                                    username="stephen",
                                    password="password",
-                                   future_class=Future)
+                                   loop=self.loop)
+
+    def tearDown(self):
+        self.loop.close()
 
     def test_manual_session(self):
 
@@ -521,7 +486,7 @@ class AsyncioSessionTest(unittest.TestCase):
             stream = session.send("v", processor="session")
             resp2 = await stream.read()
             self.assertEqual(resp.data[0], resp2.data[0])
-            session.close()
+            await session.close()
 
         self.loop.run_until_complete(go())
 
@@ -529,8 +494,11 @@ class AsyncioSessionTest(unittest.TestCase):
 
         async def go():
             session = await self.graph.connect()
-            with self.assertRaises(RuntimeError):
-                stream = session.send("v = 1+1", processor="session")
+            try:
+                with self.assertRaises(RuntimeError):
+                    stream = session.send("v = 1+1", processor="session")
+            finally:
+                await session.close()
 
         self.loop.run_until_complete(go())
 
@@ -543,7 +511,7 @@ class AsyncioSessionTest(unittest.TestCase):
             stream = session.send("v")
             resp2 = await stream.read()
             self.assertEqual(resp.data[0], resp2.data[0])
-
+            await session.close()
         self.loop.run_until_complete(go())
 
 
@@ -557,9 +525,9 @@ class AsyncioAPITests(unittest.TestCase):
         async def go():
             conn = await create_connection(
                 "ws://localhost:8182/", password="password",
-                username="stephen", loop=self.loop, future_class=Future)
+                username="stephen", loop=self.loop)
             self.assertFalse(conn.conn.closed)
-            conn.close()
+            await conn.close()
 
         self.loop.run_until_complete(go())
 
@@ -568,9 +536,8 @@ class AsyncioAPITests(unittest.TestCase):
 
         async def go():
             stream = await submit(
-                "ws://localhost:8182/", "1 + 1",
-                password="password", username="stephen", loop=self.loop,
-                future_class=Future)
+                "ws://localhost:8182/", "1 + 1", password="password",
+                username="stephen", loop=self.loop)
             while True:
                 msg = await stream.read()
                 if msg is None:
@@ -585,13 +552,13 @@ class AsyncioAPITests(unittest.TestCase):
         async def go():
             with self.assertRaises(RuntimeError):
                 stream = await submit("ws://localhost:8182/",
-                                      "throw new Exception('error')",
-                                      password="password", username="stephen",
-                                      loop=self.loop, future_class=Future)
+                                           "throw new Exception('error')",
+                                           password="password",
+                                           username="stephen",
+                                           loop=self.loop)
                 await stream.read()
 
         self.loop.run_until_complete(go())
-
 
 
 if __name__ == "__main__":

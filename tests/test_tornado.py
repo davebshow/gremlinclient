@@ -2,13 +2,16 @@ import uuid
 import unittest
 from datetime import timedelta
 from logging import DEBUG
+
 import tornado
 from tornado import gen
 from tornado.concurrent import Future
 from tornado.websocket import WebSocketClientConnection
 from tornado.testing import gen_test, AsyncTestCase
-from gremlinclient import (
-    submit, GraphDatabase, Pool, Stream, create_connection, Response)
+
+from gremlinclient.connection import Stream
+from gremlinclient.tornado import (
+    submit, GraphDatabase, Pool, create_connection, Response)
 
 
 LOG_LEVEL = DEBUG
@@ -193,7 +196,7 @@ class TornadoPoolTest(AsyncTestCase):
         self.assertEqual(len(pool.pool), 0)
         c1 = yield pool.acquire()
         self.assertEqual(len(pool._acquired), 1)
-        pool.release(c1)
+        yield pool.release(c1)
         self.assertEqual(len(pool.pool), 1)
         self.assertEqual(len(pool._acquired), 0)
 
@@ -205,7 +208,7 @@ class TornadoPoolTest(AsyncTestCase):
                     password="password",
                     log_level=LOG_LEVEL)
         c1 = yield pool.acquire()
-        pool.release(c1)
+        yield pool.release(c1)
         c2 = yield pool.acquire()
         self.assertEqual(c1, c2)
 
@@ -227,7 +230,7 @@ class TornadoPoolTest(AsyncTestCase):
         pool1.pool.append(conn2)
         pool1.pool.append(conn3)
         pool1.pool.append(conn4)
-        pool1.release(conn1)
+        yield pool1.release(conn1)
         self.assertTrue(conn1.closed)
 
     @gen_test
@@ -241,7 +244,7 @@ class TornadoPoolTest(AsyncTestCase):
         c1 = yield pool.acquire()
         self.assertEqual(len(pool._acquired), 1)
         c1.close()
-        pool.release(c1)
+        yield pool.release(c1)
         self.assertEqual(len(pool.pool), 0)
         self.assertEqual(len(pool._acquired), 0)
 
@@ -274,7 +277,7 @@ class TornadoPoolTest(AsyncTestCase):
         self.assertIsInstance(c3, Future)
         with self.assertRaises(tornado.gen.TimeoutError):
             yield gen.with_timeout(timedelta(seconds=0.1), c3)
-        pool.release(c2)
+        yield pool.release(c2)
         c3 = yield c3
         self.assertEqual(c2, c3)
         c1.conn.close()
@@ -290,7 +293,7 @@ class TornadoPoolTest(AsyncTestCase):
                     log_level=LOG_LEVEL)
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
-        pool.release(c2)
+        yield pool.release(c2)
         pool.close()
         self.assertTrue(c2.conn.closed)
         self.assertFalse(c1.conn.closed)
@@ -313,46 +316,46 @@ class TornadoPoolTest(AsyncTestCase):
         c2.close()
 
 
-class TornadoCtxtMngrTest(AsyncTestCase):
-
-    @gen_test
-    def test_pool_manager(self):
-        pool = Pool("ws://localhost:8182/",
-                    maxsize=2,
-                    username="stephen",
-                    password="password")
-        with (yield pool) as conn:
-            self.assertFalse(conn.closed)
-        self.assertEqual(len(pool.pool), 1)
-        self.assertEqual(len(pool._acquired), 0)
-        pool.close()
-
-    @gen_test
-    def test_graph_manager(self):
-        graph = GraphDatabase("ws://localhost:8182/",
-                                username="stephen",
-                                password="password")
-        with (yield graph) as conn:
-            self.assertFalse(conn.closed)
-
-    @gen_test
-    def test_pool_enter_runtime_error(self):
-        pool = Pool("ws://localhost:8182/",
-                    maxsize=2,
-                    username="stephen",
-                    password="password")
-        with self.assertRaises(RuntimeError):
-            with pool as conn:
-                self.assertFalse(conn.closed)
-
-    @gen_test
-    def test_conn_enter_runtime_error(self):
-        graph = GraphDatabase("ws://localhost:8182/",
-                                username="stephen",
-                                password="password")
-        with self.assertRaises(RuntimeError):
-            with graph as conn:
-                self.assertFalse(conn.closed)
+# class TornadoCtxtMngrTest(AsyncTestCase):
+    #
+    # @gen_test
+    # def test_pool_manager(self):
+    #     pool = Pool("ws://localhost:8182/",
+    #                 maxsize=2,
+    #                 username="stephen",
+    #                 password="password")
+    #     with (yield pool) as conn:
+    #         self.assertFalse(conn.closed)
+    #     self.assertEqual(len(pool.pool), 1)
+    #     self.assertEqual(len(pool._acquired), 0)
+    #     pool.close()
+    #
+    # @gen_test
+    # def test_graph_manager(self):
+    #     graph = GraphDatabase("ws://localhost:8182/",
+    #                             username="stephen",
+    #                             password="password")
+    #     with (yield graph) as conn:
+    #         self.assertFalse(conn.closed)
+    #
+    # @gen_test
+    # def test_pool_enter_runtime_error(self):
+    #     pool = Pool("ws://localhost:8182/",
+    #                 maxsize=2,
+    #                 username="stephen",
+    #                 password="password")
+    #     with self.assertRaises(RuntimeError):
+    #         with pool as conn:
+    #             self.assertFalse(conn.closed)
+    #
+    # @gen_test
+    # def test_conn_enter_runtime_error(self):
+    #     graph = GraphDatabase("ws://localhost:8182/",
+    #                             username="stephen",
+    #                             password="password")
+    #     with self.assertRaises(RuntimeError):
+    #         with graph as conn:
+    #             self.assertFalse(conn.closed)
 
 
 class TornadoCallbackStyleTest(AsyncTestCase):
@@ -451,18 +454,18 @@ class TornadoAPITests(AsyncTestCase):
             yield stream.read()
 
 
-class TestDeserialization(AsyncTestCase):
-
-    @gen_test
-    def test_complex_map_bindings(self):
-        stream = yield submit("ws://localhost:8182/",
-                              "x.b",
-                              bindings={"x":{'f': {'foo': 'bar'}, 'b': ['bar', None, 1.5, {'b': 1}]}},
-                              password="password", username="stephen")
-        resp = yield stream.read()
-        self.assertEqual(resp.data[0], 'bar')
-        self.assertIsNone(resp.data[1])
-        self.assertEqual(resp.data[3]['b'], 1)
+# class TestDeserialization(AsyncTestCase):
+#
+#     @gen_test
+#     def test_complex_map_bindings(self):
+#         stream = yield submit("ws://localhost:8182/",
+#                               "x.b",
+#                               bindings={"x":{'f': {'foo': 'bar'}, 'b': ['bar', None, 1.5, {'b': 1}]}},
+#                               password="password", username="stephen")
+#         resp = yield stream.read()
+#         self.assertEqual(resp.data[0], 'bar')
+#         self.assertIsNone(resp.data[1])
+#         self.assertEqual(resp.data[3]['b'], 1)
 
 
 if __name__ == "__main__":

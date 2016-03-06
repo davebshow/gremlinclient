@@ -1,26 +1,19 @@
-try:
-    from tornado import concurrent
-except ImportError:
-    pass
-
-from gremlinclient.graph import GraphDatabase
-
-
-def submit(url,
-           gremlin,
-           bindings=None,
-           lang="gremlin-groovy",
-           aliases=None,
-           op="eval",
-           processor="",
-           graph=None,
-           timeout=None,
-           session=None,
-           loop=None,
-           username="",
-           password="",
-           validate_cert=False,
-           future_class=None):
+def _submit(url,
+            gremlin,
+            graph_class,
+            bindings=None,
+            lang="gremlin-groovy",
+            aliases=None,
+            op="eval",
+            processor="",
+            graph=None,
+            timeout=None,
+            session=None,
+            loop=None,
+            username="",
+            password="",
+            validate_cert=False,
+            future_class=None):
     """
     Submit a script to the Gremlin Server.
 
@@ -47,15 +40,14 @@ def submit(url,
 
     :returns: :py:class:`gremlinclient.connection.Stream` object:
     """
-    future_class = future_class or concurrent.Future
-    graph = graph or GraphDatabase(url,
-                                   timeout=timeout,
-                                   username=username,
-                                   password=password,
-                                   loop=loop,
-                                   validate_cert=validate_cert,
-                                   future_class=future_class)
+    graph = graph_class(url,
+                        timeout=timeout,
+                        username=username,
+                        password=password,
+                        loop=loop,
+                        future_class=future_class)
 
+    future_class = graph.future_class
     future = future_class()
     future_conn = graph.connect(force_close=True)
 
@@ -66,8 +58,8 @@ def submit(url,
             future.set_exception(e)
         else:
             stream = conn.send(gremlin, bindings=bindings, lang=lang,
-                                 aliases=aliases, op=op, processor=processor,
-                                 session=session, timeout=timeout)
+                               aliases=aliases, op=op, processor=processor,
+                               session=session, timeout=timeout)
             future.set_result(stream)
 
     future_conn.add_done_callback(on_connect)
@@ -75,9 +67,9 @@ def submit(url,
     return future
 
 
-def create_connection(url, timeout=None, username="", password="",
-                      loop=None, validate_cert=False, session=None,
-                      force_close=False, future_class=None):
+def _create_connection(url, graph_class, timeout=None, username="", password="",
+                       loop=None, validate_cert=False, session=None,
+                       force_close=False, future_class=None):
     """
     Get a database connection from the Gremlin Server.
 
@@ -96,12 +88,11 @@ def create_connection(url, timeout=None, username="", password="",
     :param str session: Session id (optional). Typically a uuid
     :returns: :py:class:`gremlinclient.connection.Connection` object:
     """
-    future_class = future_class or concurrent.Future
-    graph = GraphDatabase(url,
-                          timeout=timeout,
-                          username=username,
-                          password=password,
-                          loop=loop,
-                          validate_cert=validate_cert,
-                          future_class=future_class)
+    graph = graph_class(url,
+                        timeout=timeout,
+                        username=username,
+                        password=password,
+                        loop=loop,
+                        validate_cert=validate_cert,
+                        future_class=future_class)
     return graph.connect(force_close=force_close)

@@ -4,17 +4,8 @@ import textwrap
 
 from logging import WARNING
 
-try:
-    from tornado import concurrent
-except ImportError:
-    pass
-
 from gremlinclient.graph import GraphDatabase
 from gremlinclient.log import pool_logger
-
-
-PY_33 = sys.version_info >= (3, 3)
-PY_35 = sys.version_info >= (3, 5)
 
 
 class Pool(object):
@@ -36,8 +27,8 @@ class Pool(object):
         :py:class:`tornado.concurrent.Future`
     """
     def __init__(self, url, timeout=None, username="", password="",
-                 graph=None, maxsize=256, loop=None,
-                 force_release=False, future_class=None, log_level=WARNING):
+                 graph_class=None, maxsize=256, loop=None,
+                 force_release=False, log_level=WARNING, future_class=None):
         self._maxsize = maxsize
         self._pool = collections.deque()
         self._waiters = collections.deque()
@@ -46,12 +37,15 @@ class Pool(object):
         self._closed = False
         self._loop = loop
         self._force_release = force_release
-        self._future_class = future_class or concurrent.Future
-        self._graph = graph or GraphDatabase(url,
-                                             timeout=timeout,
-                                             username=username,
-                                             password=password,
-                                             future_class=future_class)
+        if graph_class is None:
+            graph_class = GraphDatabase
+        self._graph = graph_class(url,
+                                  timeout=timeout,
+                                  username=username,
+                                  password=password,
+                                  future_class=future_class,
+                                  loop=loop)
+        self._future_class = self._graph.future_class
         pool_logger.setLevel(log_level)
 
     @property
@@ -118,14 +112,18 @@ class Pool(object):
             :py:class:`tornado.concurrent.Future`
         """
         future = self._future_class()
-        while self._pool:
-            conn = self._pool.popleft()
-            if not conn.closed:
-                pool_logger.debug("Reusing connection: {}".format(conn))
-                future.set_result(conn)
-                self._acquired.add(conn)
-                break
-        if self.size < self.maxsize:
+        if self._pool:
+            while self._pool:
+                conn = self._pool.popleft()
+                if not conn.closed:
+                    pool_logger.debug("Reusing connection: {}".format(conn))
+                    future.set_result(conn)
+                    self._acquired.add(conn)
+                    break
+                else:
+                    pool_logger.debug(
+                        "Discarded closed connection: {}".format(conn))
+        elif self.size < self.maxsize:
             self._acquiring += 1
             conn_future = self.graph.connect(
                 force_release=self._force_release, pool=self)
@@ -142,7 +140,8 @@ class Pool(object):
                     self._acquiring -= 1
             conn_future.add_done_callback(cb)
         else:
-            pool_logger.debug("Waiting for available conn...")
+            pool_logger.debug(
+                "Waiting for available conn on future: {}...".format(future))
             self._waiters.append(future)
         return future
 
@@ -153,19 +152,28 @@ class Pool(object):
         :param gremlinclient.connection.Connection: The connection to be
             released
         """
+        future = self._future_class()
         if self.size <= self.maxsize:
             if conn.closed:
                 # conn has been closed
+                pool_logger.info(
+                    "Released closed connection: {}".format(conn))
                 self._acquired.remove(conn)
+                conn = None
             elif self._waiters:
                 waiter = self._waiters.popleft()
                 waiter.set_result(conn)
+                pool_logger.debug(
+                    "Completeing future with connection: {}".format(conn))
             else:
                 self._pool.append(conn)
                 self._acquired.remove(conn)
+            future.set_result(None)
         else:
-            conn.close()
-            self._acquired.remove(conn)
+            future_conn = conn.close()
+            future_conn.add_done_callback(
+                lambda f: future.set_result(f.result()))
+        return future
 
     def close(self):
         """
@@ -179,109 +187,12 @@ class Pool(object):
             f.cancel()
         self._graph = None
         self._closed = True
+        pool_logger.info(
+            "Connection pool {} has been closed".format(self))
 
-# The follwoing is inspired by:
-# https://github.com/aio-libs/aioredis/blob/master/aioredis/pool.py
-# and
-# http://www.tornadoweb.org/en/stable/_modules/tornado/concurrent.html#Future
     def __enter__(self):
         raise RuntimeError(
                 "context manager should use some variation of yield/yield from")
 
     def __exit__(self, *args):
         pass  # pragma: no cover
-
-    if not PY_33:  # pragma: no cover
-        def __await__(self):
-            future = self._future_class()
-            future_conn = self.acquire()
-
-            def on_connect(f):
-                try:
-                    conn = f.result()
-                except Exception as e:
-                    future.set_exception(e)
-                else:
-                    future.set_result(
-                        _PoolConnectionContextManager(self, conn))
-
-            future_conn.add_done_callback(on_connect)
-            result = yield future
-            # StopIteration doesn't take args before py33,
-            # but Cython recognizes the args tuple.
-            e = StopIteration()
-            e.args = (result,)
-            raise e
-
-    if PY_33:  # pragma: no cover
-        exec(textwrap.dedent("""
-
-        def __iter__(self):
-            future = self._future_class()
-            future_conn = self.acquire()
-
-            def on_connect(f):
-                try:
-                    conn = f.result()
-                except Exception as e:
-                    future.set_exception(e)
-                else:
-                    future.set_result(
-                        _PoolConnectionContextManager(self, conn))
-
-            future_conn.add_done_callback(on_connect)
-            if isinstance(future, concurrent.Future):
-                return (yield future)
-            return (yield from future)
-
-        __await__ = __iter__"""))
-
-    # if PY_35:
-    #     exec(textwrap.dedent("""
-    #     def connection(self):
-    #         '''Return async context manager for working with connection.
-    #
-    #         async with pool.get() as conn:
-    #         '''
-    #         return _AsyncConnectionContextManager(self)"""))
-
-
-class _PoolConnectionContextManager(object):
-
-    __slots__ = ('_pool', '_conn')
-
-    def __init__(self, pool, conn):
-        self._pool = pool
-        self._conn = conn
-
-    def __enter__(self):
-        return self._conn
-
-    def __exit__(self, exc_type, exc_value, tb):
-        try:
-            self._pool.release(self._conn)
-        finally:
-            self._pool = None
-            self._conn = None
-
-
-# if PY_35:
-#     exec(textwrap.dedent("""
-#     class _AsyncPoolConnectionContextManager:
-#
-#         __slots__ = ('_pool', '_conn')
-#
-#         def __init__(self, pool):
-#             self._pool = pool
-#             self._conn = None
-#
-#         async def __aenter__(self):
-#             self._conn = await self._pool.acquire()
-#             return self._conn
-#
-#         async def __aexit__(self, exc_type, exc_value, tb):
-#             try:
-#                 self._pool.release(self._conn)
-#             finally:
-#                 self._pool = None
-#                 self._conn = None"""))

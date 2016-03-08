@@ -10,8 +10,8 @@ setup(
     author_email="davebshow@gmail.com",
     description="Python driver for TP3 Gremlin Server",
     long_description=open("README.txt").read(),
-    packages=["gremlinclient", "greminclient.aiohttp",
-              "greminclient.tornado", "tests"],
+    packages=["gremlinclient", "gremlinclient.aiohttp",
+              "gremlinclient.tornado", "tests"],
     install_requires=[
         "tornado==4.3"
     ],

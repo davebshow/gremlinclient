@@ -3,14 +3,15 @@ from setuptools import setup
 
 setup(
     name="gremlinclient",
-    version="0.2.0",
+    version="0.2.1",
     url="",
     license="MIT",
     author="davebshow",
     author_email="davebshow@gmail.com",
     description="Python driver for TP3 Gremlin Server",
     long_description=open("README.txt").read(),
-    packages=["gremlinclient", "tests"],
+    packages=["gremlinclient", "greminclient.aiohttp",
+              "greminclient.tornado", "tests"],
     install_requires=[
         "tornado==4.3"
     ],

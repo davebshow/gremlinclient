@@ -13,7 +13,7 @@ implementation.
 
 Releases
 ========
-The latest release of :py:mod:`gremlinclient` is **0.2.0**.
+The latest release of :py:mod:`gremlinclient` is **0.2.1**.
 
 
 Requirements

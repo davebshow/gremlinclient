@@ -7,30 +7,38 @@
 gremlinclient
 =============
 
-:py:mod:`gremlinclient` is an asynchronous Python client for the
-`TinkerPop 3 Gremlin Server`_ based on the `Tornado`_ websocket client
-implementation.
+:py:mod:`gremlinclient` is an asynchronous multi-client Python driver for the
+`TinkerPop 3 Gremlin Server`_. By default, it uses the `Tornado`_ websocket client
+implementation to communicate with the server, but it is designed to support "pluggable"
+client implementations. In addition to Tornado, it currently supports the `aiohttp`_,
+websocket client implementation with support for `Pulsar`_ and `requests-futures`_
+coming soon.
 
 Releases
 ========
-The latest release of :py:mod:`gremlinclient` is **0.2.1**.
-
+The latest release of :py:mod:`gremlinclient` is **0.2.2**.
 
 Requirements
 ============
 
-:py:mod:`gremlinclient` is built on `Tornado`_ and works with most versions of Python:
+:py:mod:`gremlinclient` with Tornado requires Python 2.7+. That said, there are a variety of
+client/library combinations that work with different versions of Python.
+
+Tornado
 
 - Python 2.7+
-- Tornado 4.1+
 
-:py:mod:`gremlinclient` also supports `Asyncio`_ as follows:
+Tornado w/`Asyncio`_
 
-- Python 3.4+, Python 3.3 and `Asyncio`_, or Python 2.7 and `Trollius`_
+- Python 3.3+
 
-Already using `aiohttp`_? Checkout `aiogremlin`_.
+Tornado w/`Trollius`_
 
-Prefer to use the REST interface? Checkout `gremlinrestclient`_.
+- Python 2.7
+
+aiohttp
+
+- Python 3.4+
 
 Installation
 ============
@@ -47,7 +55,7 @@ Submit a script to the Gremlin Server with Python 2.7 or 3.3+ using Tornado::
 
     >>> from tornado import gen
     >>> from tornado.ioloop import IOLoop
-    >>> from gremlinclient import submit
+    >>> from gremlinclient.tornado_client import submit
 
     >>> loop = IOLoop.current()
 
@@ -63,77 +71,6 @@ Submit a script to the Gremlin Server with Python 2.7 or 3.3+ using Tornado::
 
     Message(status_code=200, data=[2], message=u'', metadata={})
 
-Submit a script to the Gremlin Server with Python 3.3+ and Asyncio::
-
-    >>> import asyncio
-    >>> from tornado.platform.asyncio import AsyncIOMainLoop
-    >>> from gremlinclient import submit
-
-    >>> AsyncIOMainLoop().install() # Use the asyncio event loop
-    >>> loop = asyncio.get_event_loop()
-
-    >>> @asyncio.coroutine
-    ... def go():
-    ...     resp = yield from submit(
-    ...         "ws://localhost:8182/", "1 + 1",
-    ...         future_class=asyncio.Future)
-    ...     while True:
-    ...         msg = yield from resp.read()
-    ...         if msg is None:
-    ...             break
-    ...         print(msg)
-    >>> loop.run_until_complete(go())
-
-    Message(status_code=200, data=[2], message=u'', metadata={})
-
-
-Submit a script with Python 3.5 using PEP492 async/await syntax (Asyncio)::
-
-    >>> import asyncio
-    >>> from tornado.platform.asyncio import AsyncIOMainLoop
-    >>> from gremlinclient import submit
-
-    >>> AsyncIOMainLoop().install() # Use the asyncio event loop
-    >>> loop = asyncio.get_event_loop()
-
-    >>> async def go():
-    ...     resp = await submit(
-    ...         "ws://localhost:8182/", "1 + 1",
-    ...         future_class=asyncio.Future)
-    ...     while True:
-    ...         msg = await resp.read()
-    ...         if msg is None:
-    ...             break
-    ...         print(msg)
-    >>> loop.run_until_complete(go())
-
-    Message(status_code=200, data=[2], message=u'', metadata={})
-
-Submit a script to the Gremlin Server with Python 2.7 using Trollius::
-
-    >>> import trollius
-    >>> from tornado.platform.asyncio import AsyncIOMainLoop
-    >>> from gremlinclient import submit
-
-    >>> AsyncIOMainLoop().install() # Use the asyncio event loop
-    >>> loop = trollius.get_event_loop()
-
-    >>> @trollius.coroutine
-    ... def go():
-    ...     fut = submit(
-    ...         "ws://localhost:8182/", "1 + 1",
-    ...         future_class=trollius.Future)
-    ...     resp = yield trollius.From(fut)
-    ...     while True:
-    ...         fut_msg = resp.read()
-    ...         msg = yield trollius.From(fut_msg)
-    ...         if msg is None:
-    ...             break
-    ...         print(msg)
-    >>> loop.run_until_complete(go())
-
-    Message(status_code=200, data=[2], message=u'', metadata={})
-
 
 Contents:
 
@@ -141,6 +78,8 @@ Contents:
    :maxdepth: 3
 
    usage
+   using_aiohttp
+   tornado_asyncio_integration
    modules
 
 
@@ -159,3 +98,5 @@ Indices and tables
 .. _`aiogremlin`: http://aiogremlin.readthedocs.org/en/latest/
 .. _`gremlinrestclient`: http://gremlinrestclient.readthedocs.org/en/latest/
 .. _`Trollius`: http://trollius.readthedocs.org/
+.. _`requests-futures`: https://pypi.python.org/pypi/requests-futures
+.. _`Pulsar`: https://pythonhosted.org/pulsar/

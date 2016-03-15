@@ -3,6 +3,7 @@ from logging import WARNING
 import socket
 
 from tornado import concurrent
+from tornado.gen import with_timeout
 from tornado.httpclient import HTTPRequest, HTTPError
 from tornado.websocket import websocket_connect
 
@@ -31,13 +32,17 @@ class Response(Response):
     @property
     def closed(self):
         """
-        :returns: Connection protocol. None if conn is closed
+        :returns: bool True is conn is closed.
         """
         return self._conn.protocol is None
 
     def close(self):
         """
-        Close underlying client connection
+        Close underlying client connection.
+
+        :returns: type of Future -
+            :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
+            :py:class:`tornado.concurrent.Future`
         """
         self._conn.close()
         f = self._future_class()
@@ -58,13 +63,28 @@ class Response(Response):
         Read a message off the websocket.
         :param callback: To be called on message read.
 
-        :returns: :py:class:`tornado.concurrent.Future`
+        :returns: :py:class:type of Future -
+            :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
+            :py:class:`tornado.concurrent.Future`
         """
         return self._conn.read_message(callback=callback)
 
 
 class GraphDatabase(GraphDatabase):
+    """This class generates connections to the Gremlin Server.
 
+    :param str url: url for Gremlin Server.
+    :param float timeout: timeout for establishing connection (optional).
+        Values ``0`` or ``None`` mean no timeout
+    :param str username: Username for SASL auth
+    :param str password: Password for SASL auth
+    :param loop: If param is ``None``, `tornado.ioloop.IOLoop.current`
+        is used for getting default event loop (optional)
+    :param bool validate_cert: validate ssl certificate. False by default
+    :param class future_class: type of Future -
+        :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
+        :py:class:`tornado.concurrent.Future`
+    """
     def __init__(self, url, timeout=None, username="", password="",
                  loop=None, validate_cert=False, future_class=None):
         if future_class is None:
@@ -83,7 +103,10 @@ class GraphDatabase(GraphDatabase):
         future = self._future_class()
         if not isinstance(self._url, HTTPRequest):
             request = HTTPRequest(self._url, validate_cert=self._validate_cert)
-        future_conn = websocket_connect(request)
+        if self._timeout:
+            future_conn = with_timeout(timeout, websocket_connect(request))
+        else:
+            future_conn = websocket_connect(request)
 
         def get_conn(f):
             try:
@@ -111,6 +134,23 @@ class GraphDatabase(GraphDatabase):
 
 
 class Pool(Pool):
+    """
+    Pool of :py:class:`gremlinclient.connection.Connection` objects.
+
+    :param str url: url for Gremlin Server.
+    :param float timeout: timeout for establishing connection (optional).
+        Values ``0`` or ``None`` mean no timeout
+    :param str username: Username for SASL auth
+    :param str password: Password for SASL auth
+    :param gremlinclient.tornado_client.client.GraphDatabase graph: The graph
+        instance used to create connections
+    :param int maxsize: Maximum number of connections.
+    :param loop: event loop
+    :param bool validate_cert: validate ssl certificate. False by default
+    :param class future_class: type of Future -
+        :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
+        :py:class:`tornado.concurrent.Future`
+    """
     def __init__(self, url, timeout=None, username="", password="",
                  maxsize=256, loop=None, force_release=False,
                  log_level=WARNING, future_class=None):

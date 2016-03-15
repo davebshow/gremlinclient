@@ -1,2 +1,2 @@
-from gremlinclient.aiohttp.aiohttp import (
+from gremlinclient.aiohttp_client.client import (
     Response, GraphDatabase, Pool, submit, create_connection)

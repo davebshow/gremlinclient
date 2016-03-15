@@ -1,7 +1,7 @@
-.. _gremlinclient-client-reference:
+.. _base-class-reference:
 
-Client Reference
-================
+Base Class Reference
+====================
 
 gremlinclient package
 ---------------------

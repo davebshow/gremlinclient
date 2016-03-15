@@ -9,7 +9,7 @@ import tornado
 from tornado.platform.asyncio import AsyncIOMainLoop
 from tornado.websocket import WebSocketClientConnection
 from gremlinclient.connection import Stream
-from gremlinclient.tornado import (
+from gremlinclient.tornado_client import (
     submit, GraphDatabase, Pool, create_connection, Response)
 
 

@@ -5,7 +5,7 @@ import unittest
 import aiohttp
 
 from gremlinclient import Stream
-from gremlinclient.aiohttp import (
+from gremlinclient.aiohttp_client import (
     GraphDatabase, Pool, Response, submit, create_connection)
 
 

@@ -25,20 +25,21 @@ class Response(Response):
     """
     Wrapper for aiohttp websocket client connection.
 
-    :param conn: The websocket
+    :param aiohttp.ClientWebSocketResponse conn: The websocket
         connection
     """
 
     @property
     def closed(self):
         """
-        :returns: Connection protocol. None if conn is closed
+        :returns: bool. True if conn is closed
         """
         return self._conn.closed
 
     def close(self):
         """
         Close underlying client connection
+        :returns: :py:class:`asyncio.Future`
         """
         return asyncio.async(self._conn.close(), loop=self._loop)
 
@@ -59,7 +60,7 @@ class Response(Response):
         Read a message off the websocket.
         :param callback: To be called on message read.
 
-        :returns: :py:class:`tornado.concurrent.Future`
+        :returns: :py:class:`asyncio.Future`
         """
         future = self._future_class()
         future_read = asyncio.async(self._conn.receive(), loop=self._loop)
@@ -99,6 +100,20 @@ class Response(Response):
 
 
 class GraphDatabase(GraphDatabase):
+    """This class generates connections to the Gremlin Server.
+
+    :param str url: url for Gremlin Server.
+    :param float timeout: timeout for establishing connection (optional).
+        Values ``0`` or ``None`` mean no timeout
+    :param str username: Username for SASL auth
+    :param str password: Password for SASL auth
+    :param loop: If param is ``None``, `tornado.ioloop.IOLoop.current`
+        is used for getting default event loop (optional)
+    :param bool validate_cert: validate ssl certificate. False by default
+    :param class future_class: type of Future -
+        :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
+        :py:class:`tornado.concurrent.Future`
+    """
 
     def __init__(self, url, timeout=None, username="", password="",
                  loop=None, validate_cert=False, future_class=None):
@@ -118,7 +133,10 @@ class GraphDatabase(GraphDatabase):
                                          verify_ssl=self._validate_cert)
         future = self._future_class()
         ws = aiohttp.ws_connect(self._url, connector=connector, loop=self._loop)
-        future_conn = asyncio.async(ws, loop=self._loop)
+        if self._timeout:
+            future_conn = asyncio.wait_for(ws, self._timeout, loop=self._loop)
+        else:
+            future_conn = asyncio.async(ws, loop=self._loop)
 
         def on_connect(f):
             try:
@@ -138,17 +156,24 @@ class GraphDatabase(GraphDatabase):
 
         return future
 
-    # Borrowed from: https://github.com/aio-libs/aioredis/blob/master/aioredis/pool.py
-    if PY_35:
-        def get(self):
-            '''Return async context manager for working with connection.
-
-            async with pool.get() as conn:
-            '''
-            return _AsyncGraphConnectionContextManager(self)
-
 
 class Pool(Pool):
+    """
+    Pool of :py:class:`gremlinclient.connection.Connection` objects.
+
+    :param str url: url for Gremlin Server.
+    :param float timeout: timeout for establishing connection (optional).
+        Values ``0`` or ``None`` mean no timeout
+    :param str username: Username for SASL auth
+    :param str password: Password for SASL auth
+    :param gremlinclient.aiohttp_client.client.GraphDatabase graph: The graph
+        instance used to create connections
+    :param int maxsize: Maximum number of connections.
+    :param loop: event loop
+    :param bool validate_cert: validate ssl certificate. False by default
+    :param class future_class: type of Future -
+        :py:class:`asyncio.Future` by default
+    """
     def __init__(self, url, timeout=None, username="", password="",
                  maxsize=256, loop=None, log_level=WARNING,
                  future_class=None, force_release=False):
@@ -158,13 +183,14 @@ class Pool(Pool):
                          force_release=force_release)
 
     def close(self):
+        """
+        Close pool.
+        :returns: :py:class:`asyncio.Future`
+        """
         return asyncio.async(self._close(), loop=self._loop)
 
     @asyncio.coroutine
     def _close(self):
-        """
-        Close pool
-        """
         to_close = []
         while self.pool:
             conn = self.pool.popleft()
@@ -179,6 +205,13 @@ class Pool(Pool):
             "Connection pool {} has been closed".format(self))
 
     def release(self, conn):
+        """
+        Release a connection back to the pool.
+
+        :param gremlinclient.connection.Connection: The connection to be
+            released
+        :returns: :py:class:`asyncio.Future`
+        """
         return asyncio.async(self._release(conn), loop=self._loop)
 
     @asyncio.coroutine
@@ -224,8 +257,7 @@ def submit(url,
     :param str password: Password for SASL auth
     :param bool validate_cert: validate ssl certificate. False by default
     :param class future_class: type of Future -
-        :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
-        :py:class:`tornado.concurrent.Future`
+        :py:class:`asyncio.Future` by default
 
     :returns: :py:class:`gremlinclient.connection.Stream` object:
     """
@@ -252,8 +284,7 @@ def create_connection(url, timeout=None, username="", password="",
     :param bool validate_cert: validate ssl certificate. False by default
     :param bool force_close: force connection to close after read.
     :param class future_class: type of Future -
-        :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
-        :py:class:`tornado.concurrent.Future`
+        :py:class:`asyncio.Future` by default
     :param str session: Session id (optional). Typically a uuid
     :returns: :py:class:`gremlinclient.connection.Connection` object:
     """

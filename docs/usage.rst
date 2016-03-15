@@ -1,15 +1,19 @@
+.. _basic-usage:
+
 Using :py:mod:`Gremlinclient`
 =============================
 
 Before you get started, make sure you have the `Gremlin Server`_ up and running.
-All of the following examples use the `PEP 492`_ Python 3.5 async/await syntax, but
-they can all be adjusted as shown in :ref:`Getting Started<getting-started>`.
+All of the following examples use the Tornado client with `PEP 492`_
+Python 3.5 async/await syntax, but they can all be adjusted as shown in
+:ref:`Using aiohttp<using-aiohttp>` and
+:ref:`Tornado Asyncio Ingegration<tornado-asyncio>`.
 
 
 Simple :py:mod:`API`
 --------------------
 
-Submit a script with :py:func:`gremlinclient.api.submit`::
+Submit a script with :py:func:`gremlinclient.tornado_client.client.submit`::
 
     >>> async def do_submit():
     ...     resp = await submit(
@@ -20,7 +24,7 @@ Submit a script with :py:func:`gremlinclient.api.submit`::
     ...         if msg is None:
     ...             break  # connection closes automatically
 
-Get a database connection with :py:func:`gremlinclient.api.create_connection`::
+Get a database connection with :py:func:`gremlinclient.tornado_client.client.create_connection`::
 
     >>> async def get_conn():
     ...     conn = await create_connection("ws://localhost:8182/")
@@ -36,7 +40,7 @@ Get a database connection with :py:func:`gremlinclient.api.create_connection`::
 The :py:class:`GraphDatabase` object
 ------------------------------------
 
-Get a database connection from :py:class:`gremlinclient.graph.GraphDatabase`::
+Get a database connection from :py:class:`gremlinclient.tornado_client.client.GraphDatabase`::
 
     >>> async def get_conn():
     ...     graph = GraphDatabase("ws://localhost:8182/")
@@ -45,7 +49,7 @@ Get a database connection from :py:class:`gremlinclient.graph.GraphDatabase`::
     ...     conn.close()
 
 Get a database session connection from
-:py:class:`gremlinclient.graph.GraphDatabase`::
+:py:class:`gremlinclient.tornado_client.client.GraphDatabase`::
 
     >>> async def get_conn():
       ...     graph = GraphDatabase("ws://localhost:8182/")
@@ -53,19 +57,11 @@ Get a database session connection from
       ...     ...
       ...     sess.close()
 
-Use :py:class:`gremlinclient.graph.GraphDatabase` as a context manager::
-
-    >>> async def get_conn():
-    ...     graph = GraphDatabase("ws://localhost:8182/")
-    ...     with await graph as conn:  # conn is automatically closed on exit
-    ...     ...
-
-Note that `async with` is not implemented yet in :py:mod:`gremlinclient`
 
 The :py:class:`Pool` object
 ---------------------------
 
-Reuse websocket connections with :py:class:`gremlinclient.pool.Pool`::
+Reuse websocket connections with :py:class:`gremlinclient.tornado_client.client.Pool`::
 
     >>> async def get_conn():
     ...     pool = Pool("ws://localhost:8182/")
@@ -73,7 +69,7 @@ Reuse websocket connections with :py:class:`gremlinclient.pool.Pool`::
     ...     ...
     ...     pool.release(conn)
 
-Automatically release connections to :py:class:`gremlinclient.pool.Pool` after read::
+Automatically release connections to :py:class:`gremlinclient.tornado_client.client.Pool` after read::
 
         >>> async def get_conn():
         ...     pool = Pool("ws://localhost:8182/", force_release=True)
@@ -85,15 +81,8 @@ Automatically release connections to :py:class:`gremlinclient.pool.Pool` after r
         ...             break  # conn is automatically released to pool.
         ...         print(msg)
 
-Use :py:class:`gremlinclient.pool.Pool` as a context manager::
 
-    >>> async def get_conn():
-    ...     graph = Pool("ws://localhost:8182/")
-    ...     with await pool as conn:  # conn is automatically released on exit
-    ...     ...
-
-
-For more info, see the :ref:`Client Reference Guide<gremlinclient-client-reference>`
+For more info, see the :ref:`Tornado Client docs<tornado-client>`
 
 
 .. _Gremlin Server: http://tinkerpop.incubator.apache.org/

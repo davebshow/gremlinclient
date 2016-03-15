@@ -10,7 +10,7 @@ from tornado.websocket import WebSocketClientConnection
 from tornado.testing import gen_test, AsyncTestCase
 
 from gremlinclient.connection import Stream
-from gremlinclient.tornado import (
+from gremlinclient.tornado_client import (
     submit, GraphDatabase, Pool, create_connection, Response)
 
 
@@ -56,12 +56,22 @@ class TornadoFactoryConnectTest(AsyncTestCase):
     def test_send(self):
         connection = yield self.graph.connect()
         resp = connection.send("1 + 1")
+        resp2 = connection.send("2 + 2")
         while True:
             msg = yield resp.read()
+            print(msg)
             if msg is None:
                 break
             self.assertEqual(msg.status_code, 200)
             self.assertEqual(msg.data[0], 2)
+        while True:
+            msg = yield resp2.read()
+            print(msg)
+            if msg is None:
+                break
+            self.assertEqual(msg.status_code, 200)
+            self.assertEqual(msg.data[0], 4)
+
         connection.conn.close()
 
     @gen_test

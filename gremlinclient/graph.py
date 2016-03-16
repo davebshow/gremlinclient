@@ -63,6 +63,7 @@ class GraphDatabase(object):
             Connection, session, force_close, force_release, pool)
 
     def session(self,
+                connector=None,
                 session=None,
                 force_close=False,
                 force_release=False,
@@ -88,14 +89,3 @@ class GraphDatabase(object):
                  force_release,
                  pool):
         raise NotImplementedError
-
-# The follwoing is inspired by:
-# https://github.com/aio-libs/aioredis/blob/master/aioredis/pool.py
-# and
-# http://www.tornadoweb.org/en/stable/_modules/tornado/concurrent.html#Future
-    def __enter__(self):
-        raise RuntimeError(
-            "context manager should use some variation of yield/yield from")
-
-    def __exit__(self, *args):
-        pass  # pragma: no cover

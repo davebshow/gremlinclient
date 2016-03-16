@@ -107,20 +107,25 @@ class GraphDatabase(GraphDatabase):
         Values ``0`` or ``None`` mean no timeout
     :param str username: Username for SASL auth
     :param str password: Password for SASL auth
-    :param loop: If param is ``None``, `tornado.ioloop.IOLoop.current`
+    :param loop: If param is ``None``, `asyncio.get_event_loop`
         is used for getting default event loop (optional)
-    :param bool validate_cert: validate ssl certificate. False by default
     :param class future_class: type of Future -
-        :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
-        :py:class:`tornado.concurrent.Future`
+        :py:class:`asyncio.Future`
+    :param func connector_factory: a factory for generating
+        :py:class:`aiohttp.TCPConnector` objects. used with ssl
     """
 
     def __init__(self, url, timeout=None, username="", password="",
-                 loop=None, validate_cert=False, future_class=None):
+                 loop=None, future_class=None, connector_factory=None):
+        loop = loop or asyncio.get_event_loop()
         future_class = functools.partial(asyncio.Future, loop=loop)
         super().__init__(url, timeout=timeout, username=username,
                          password=password, loop=loop,
-                         validate_cert=validate_cert, future_class=future_class)
+                         future_class=future_class)
+        if connector_factory is None:
+            connector_factory = functools.partial(
+                aiohttp.TCPConnector, verify_ssl=False, loop=self._loop)
+        self._connector_factory = connector_factory
 
     def _connect(self,
                  conn_type,
@@ -128,9 +133,7 @@ class GraphDatabase(GraphDatabase):
                  force_close,
                  force_release,
                  pool):
-        connector = aiohttp.TCPConnector(force_close=force_close,
-                                         loop=self._loop,
-                                         verify_ssl=self._validate_cert)
+        connector = self._connector_factory(force_close=force_close)
         future = self._future_class()
         ws = aiohttp.ws_connect(self._url, connector=connector, loop=self._loop)
         if self._timeout:
@@ -148,8 +151,7 @@ class GraphDatabase(GraphDatabase):
                 resp = Response(conn, self._future_class, loop=self._loop)
                 gc = conn_type(resp, self._future_class, self._timeout,
                                self._username, self._password, self._loop,
-                               self._validate_cert, force_close, pool,
-                               force_release, session)
+                               force_close, pool, force_release, session)
                 future.set_result(gc)
 
         future_conn.add_done_callback(on_connect)
@@ -170,17 +172,26 @@ class Pool(Pool):
         instance used to create connections
     :param int maxsize: Maximum number of connections.
     :param loop: event loop
-    :param bool validate_cert: validate ssl certificate. False by default
     :param class future_class: type of Future -
         :py:class:`asyncio.Future` by default
+    :param func connector_factory: a factory for generating
+        :py:class:`aiohttp.TCPConnector` objects. used with ssl
     """
     def __init__(self, url, timeout=None, username="", password="",
                  maxsize=256, loop=None, log_level=WARNING,
                  future_class=None, force_release=False):
-        super().__init__(url, timeout=timeout, username=username,
-                         password=password, graph_class=GraphDatabase,
-                         maxsize=maxsize, loop=loop, log_level=log_level,
-                         force_release=force_release)
+        loop = loop or asyncio.get_event_loop()
+        graph = GraphDatabase(url,
+                              timeout=timeout,
+                              username=username,
+                              password=password,
+                              future_class=future_class,
+                              loop=loop,
+                              connector_factory=connector_factory)
+        super(Pool, self).__init__(graph, maxsize=maxsize, loop=loop,
+                                   log_level=log_level,
+                                   force_release=force_release,
+                                   future_class=future_class)
 
     def close(self):
         """
@@ -234,8 +245,8 @@ def submit(url,
            loop=None,
            username="",
            password="",
-           validate_cert=False,
-           future_class=None):
+           future_class=None,
+           connector_factory=None):
     """
     Submit a script to the Gremlin Server.
 
@@ -251,26 +262,33 @@ def submit(url,
     :param float timeout: timeout for establishing connection (optional).
         Values ``0`` or ``None`` mean no timeout
     :param str session: Session id (optional). Typically a uuid
-    :param loop: If param is ``None``, :py:meth:`tornado.ioloop.IOLoop.current`
+    :param loop: If param is ``None``, :py:meth:`asyncio.get_event_loop`
         is used for getting default event loop (optional)
     :param str username: Username for SASL auth
     :param str password: Password for SASL auth
-    :param bool validate_cert: validate ssl certificate. False by default
     :param class future_class: type of Future -
         :py:class:`asyncio.Future` by default
-
+    :param func connector_factory: a factory for generating
+        :py:class:`aiohttp.TCPConnector` objects. used with ssl
     :returns: :py:class:`gremlinclient.connection.Stream` object:
     """
-    return _submit(url, gremlin, GraphDatabase, bindings=None, lang=lang,
-                   aliases=aliases, op=op, processor=processor, graph=None,
+    loop = loop or asyncio.get_event_loop()
+    graph = GraphDatabase(url,
+                          timeout=timeout,
+                          username=username,
+                          password=password,
+                          loop=loop,
+                          future_class=future_class,
+                          connector_factory=connector_factory)
+    return _submit(url, gremlin, graph, bindings=None, lang=lang,
+                   aliases=aliases, op=op, processor=processor,
                    timeout=timeout, session=session, loop=loop,
-                   username=username, password=password,
-                   validate_cert=validate_cert, future_class=None)
+                   username=username, password=password, future_class=None)
 
 
 def create_connection(url, timeout=None, username="", password="",
-                       loop=None, validate_cert=False, session=None,
-                       force_close=False, future_class=None):
+                       loop=None, session=None, force_close=False,
+                       future_class=None, connector_factory=None):
     """
     Get a database connection from the Gremlin Server.
 
@@ -279,18 +297,26 @@ def create_connection(url, timeout=None, username="", password="",
         Values ``0`` or ``None`` mean no timeout
     :param str username: Username for SASL auth
     :param str password: Password for SASL auth
-    :param loop: If param is ``None``, :py:meth:`tornado.ioloop.IOLoop.current`
+    :param loop: If param is ``None``, :py:meth:`asyncio.get_event_loop`
         is used for getting default event loop (optional)
-    :param bool validate_cert: validate ssl certificate. False by default
     :param bool force_close: force connection to close after read.
     :param class future_class: type of Future -
         :py:class:`asyncio.Future` by default
     :param str session: Session id (optional). Typically a uuid
+    :param func connector_factory: a factory for generating
+        :py:class:`aiohttp.TCPConnector` objects. used with ssl
     :returns: :py:class:`gremlinclient.connection.Connection` object:
     """
-
-    return _create_connection(url, GraphDatabase, timeout=timeout,
+    loop = loop or asyncio.get_event_loop()
+    graph = GraphDatabase(url,
+                          timeout=timeout,
+                          username=username,
+                          password=password,
+                          loop=loop,
+                          future_class=future_class,
+                          connector_factory=connector_factory)
+    return _create_connection(url, graph, timeout=timeout,
                               username=username, password=password,
-                              loop=loop, validate_cert=validate_cert,
-                              session=session, force_close=force_close,
+                              loop=loop, session=session,
+                              force_close=force_close,
                               future_class=future_class)

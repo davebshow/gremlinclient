@@ -8,11 +8,9 @@ gremlinclient
 =============
 
 :py:mod:`gremlinclient` is an asynchronous multi-client Python driver for the
-`TinkerPop 3 Gremlin Server`_. By default, it uses the `Tornado`_ websocket client
-implementation to communicate with the server, but it is designed to support "pluggable"
-client implementations. In addition to Tornado, it currently supports the `aiohttp`_,
-websocket client implementation with support for `Pulsar`_ and `requests-futures`_
-coming soon.
+`TinkerPop 3`_ `Gremlin Server`_. By default, it uses the `Tornado`_ websocket client
+implementation to communicate with the server, but it also supports `aiohttp`_ for a
+pure `Asyncio`_ implementation--support for `Pulsar`_ and `requests-futures`_ coming soon.
 
 Releases
 ========
@@ -21,7 +19,7 @@ The latest release of :py:mod:`gremlinclient` is **0.2.2**.
 Requirements
 ============
 
-:py:mod:`gremlinclient` with Tornado requires Python 2.7+. That said, there are a variety of
+:py:mod:`gremlinclient` with `Tornado`_ requires Python 2.7+. That said, there are a variety of
 client/library combinations that work with different versions of Python.
 
 Tornado
@@ -36,7 +34,7 @@ Tornado w/`Trollius`_
 
 - Python 2.7
 
-aiohttp
+`aiohttp`_
 
 - Python 3.4+
 
@@ -51,7 +49,7 @@ Install using pip::
 Getting Started
 ===============
 
-Submit a script to the Gremlin Server with Python 2.7 or 3.3+ using Tornado::
+Submit a script to the `Gremlin Server`_ with Python 2.7 or 3.3+ using `Tornado`_::
 
     >>> from tornado import gen
     >>> from tornado.ioloop import IOLoop
@@ -90,7 +88,8 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`search`
 
-.. _Tinkerpop 3 Gremlin Server: http://tinkerpop.incubator.apache.org/
+.. _Tinkerpop 3: http://tinkerpop.incubator.apache.org/
+.. _Gremlin Server: http://tinkerpop.apache.org/docs/3.1.1-incubating/reference/#gremlin-server
 .. _`Asyncio`: https://docs.python.org/3/library/asyncio.html
 .. _`aiohttp`: http://aiohttp.readthedocs.org/en/stable/
 .. _`Tornado`: http://www.tornadoweb.org/en/stable/

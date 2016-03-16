@@ -56,7 +56,6 @@ class TornadoFactoryConnectTest(AsyncTestCase):
     def test_send(self):
         connection = yield self.graph.connect()
         resp = connection.send("1 + 1")
-        resp2 = connection.send("2 + 2")
         while True:
             msg = yield resp.read()
             print(msg)
@@ -64,6 +63,7 @@ class TornadoFactoryConnectTest(AsyncTestCase):
                 break
             self.assertEqual(msg.status_code, 200)
             self.assertEqual(msg.data[0], 2)
+        resp2 = connection.send("2 + 2")
         while True:
             msg = yield resp2.read()
             print(msg)

@@ -308,4 +308,5 @@ texinfo_documents = [
 intersphinx_mapping = {
     'python': ('https://docs.python.org/', None),
     'tornado': ('http://www.tornadoweb.org/en/stable/', None),
-    'aiohttp': ('http://aiohttp.readthedocs.org/en/stable/', None)}
+    'aiohttp': ('http://aiohttp.readthedocs.org/en/stable/', None),
+    'asyncio': ('https://docs.python.org/3/library/asyncio.html', None)}

@@ -1,10 +1,7 @@
 .. _base-class-reference:
 
-Base Class Reference
-====================
-
 gremlinclient package
----------------------
+=====================
 
 .. automodule:: gremlinclient
     :members:

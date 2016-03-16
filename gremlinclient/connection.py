@@ -26,7 +26,6 @@ class Connection(object):
     :param str password: Password for SASL auth
     :param loop: If param is ``None``, `tornado.ioloop.IOLoop.current`
         is used for getting default event loop (optional)
-    :param bool validate_cert: validate ssl certificate. False by default
     :param bool force_close: force connection to close after read.
     :param class future_class: type of Future -
         :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
@@ -36,9 +35,8 @@ class Connection(object):
     :param str session: Session id (optional). Typically a uuid
     """
     def __init__(self, conn, future_class, timeout=None, username="",
-                 password="", loop=None, validate_cert=False,
-                 force_close=False, pool=None, force_release=False,
-                 session=None):
+                 password="", loop=None, force_close=False,
+                 pool=None, force_release=False, session=None):
         self._conn = conn
         self._future_class = future_class
         self._closed = False
@@ -189,7 +187,6 @@ class Session(Connection):
     :param str password: Password for SASL auth
     :param loop: If param is ``None``, `tornado.ioloop.IOLoop.current`
         is used for getting default event loop (optional)
-    :param bool validate_cert: validate ssl certificate. False by default
     :param bool force_close: force connection to close after read.
     :param class future_class: type of Future -
         :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
@@ -232,7 +229,7 @@ class Session(Connection):
                                          session=self._session,
                                          handler=handler)
 
-    def _authenticate(self, username, password):
+    def _authenticate(self, username, password, processor, session):
         super(Session, self)._authenticate(username,
                                            password,
                                            "session",
@@ -350,6 +347,7 @@ class Stream(object):
                 elif status_code == 407:
                     terminate = False
                     try:
+                        print("authentication")
                         self._conn._authenticate(
                             self._username, self._password, self._processor,
                             self._session)

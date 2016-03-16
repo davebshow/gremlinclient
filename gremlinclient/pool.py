@@ -26,9 +26,9 @@ class Pool(object):
         :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
         :py:class:`tornado.concurrent.Future`
     """
-    def __init__(self, url, timeout=None, username="", password="",
-                 graph_class=None, maxsize=256, loop=None,
-                 force_release=False, log_level=WARNING, future_class=None):
+    def __init__(self, graph, maxsize=256, loop=None, force_release=False,
+                 log_level=WARNING, future_class=None):
+        self._graph = graph
         self._maxsize = maxsize
         self._pool = collections.deque()
         self._waiters = collections.deque()
@@ -37,14 +37,6 @@ class Pool(object):
         self._closed = False
         self._loop = loop
         self._force_release = force_release
-        if graph_class is None:
-            graph_class = GraphDatabase
-        self._graph = graph_class(url,
-                                  timeout=timeout,
-                                  username=username,
-                                  password=password,
-                                  future_class=future_class,
-                                  loop=loop)
         self._future_class = self._graph.future_class
         pool_logger.setLevel(log_level)
 

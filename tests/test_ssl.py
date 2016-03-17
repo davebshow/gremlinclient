@@ -13,6 +13,8 @@ from gremlinclient.aiohttp_client import submit as aiosubmit
 from gremlinclient.tornado_client import submit as torsubmit
 
 
+# Generate files like such:
+# openssl req -nodes -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days XXX
 cert = "/home/davebshow/git/gremlinclient/keys/cert.pem"
 key = "/home/davebshow/git/gremlinclient/keys/key.pem"
 sslcontext = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
@@ -25,11 +27,6 @@ ssl: {
   enabled: true,
   keyCertChainFile: /home/davebshow/git/gremlinclient/keys/cert.pem,
   keyFile: /home/davebshow/git/gremlinclient/keys/key.pem}
-
-authentication: {
-  className: org.apache.tinkerpop.gremlin.server.auth.SimpleAuthenticator,
-  config: {
-    credentialsDb: conf/tinkergraph-credentials.properties}}
 """
 
 

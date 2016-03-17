@@ -14,7 +14,7 @@ pure `Asyncio`_ implementation--support for `Pulsar`_ and `requests-futures`_ co
 
 Releases
 ========
-The latest release of :py:mod:`gremlinclient` is **0.2.2**.
+The latest release of :py:mod:`gremlinclient` is **0.2.3**.
 
 Requirements
 ============

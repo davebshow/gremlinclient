@@ -95,8 +95,7 @@ class GraphDatabase(GraphDatabase):
             url, timeout=timeout, username=username, password=password,
             loop=loop, future_class=future_class)
         if request_factory is None:
-            request_factory = functools.partial(
-                HTTPRequest, self._url, validate_cert=False)
+            request_factory = HTTPRequest
         self._request_factory = request_factory
 
     def _connect(self,
@@ -106,7 +105,7 @@ class GraphDatabase(GraphDatabase):
                  force_release,
                  pool):
         future = self._future_class()
-        request = self._request_factory()
+        request = self._request_factory(self._url)
         if self._timeout:
             future_conn = with_timeout(timeout, websocket_connect(request))
         else:

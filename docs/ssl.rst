@@ -7,7 +7,7 @@ both the :py:mod:`aiohttp_client<gremlinclient.aiohttp_client.client>`
 and :py:mod:`tornado_client<gremlinclient.tornado_client.client>`
 modules.
 
-While SSL certs and server config are generally up to the user, but for testing
+SSL certs and server config are generally **up to the user**, but for **testing**
 you can get going with `OpenSSL`_ self-signed certificates. Something like::
 
     $ openssl req -nodes -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days XXX

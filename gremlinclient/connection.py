@@ -347,7 +347,6 @@ class Stream(object):
                 elif status_code == 407:
                     terminate = False
                     try:
-                        print("authentication")
                         self._conn._authenticate(
                             self._username, self._password, self._processor,
                             self._session)

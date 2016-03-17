@@ -179,7 +179,8 @@ class Pool(Pool):
     """
     def __init__(self, url, timeout=None, username="", password="",
                  maxsize=256, loop=None, log_level=WARNING,
-                 future_class=None, force_release=False):
+                 future_class=None, force_release=False,
+                 connector_factory=None):
         loop = loop or asyncio.get_event_loop()
         graph = GraphDatabase(url,
                               timeout=timeout,

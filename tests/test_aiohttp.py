@@ -557,6 +557,20 @@ class AsyncioAPITests(unittest.TestCase):
 
         self.loop.run_until_complete(go())
 
+    def test_bad_handler(self):
+
+        @asyncio.coroutine
+        def go():
+            conn = yield from create_connection(
+                "ws://localhost:8182/", password="password",
+                username="stephen", loop=self.loop, force_close=True)
+            stream = conn.send("g.V(12323412)", handler=lambda x: float(x))
+            with self.assertRaises(Exception):
+                msg = yield from stream.read()
+
+            yield from conn.close()
+
+        self.loop.run_until_complete(go())
 
     def test_submit(self):
 
@@ -571,6 +585,21 @@ class AsyncioAPITests(unittest.TestCase):
                     break
                 self.assertEqual(msg.status_code, 200)
                 self.assertEqual(msg.data[0], 2)
+
+        self.loop.run_until_complete(go())
+
+    def test_get_node_doesnt_exist(self):
+
+        @asyncio.coroutine
+        def go():
+            stream = yield from submit(
+                "ws://localhost:8182/", "g.V(12323412)", password="password",
+                username="stephen", loop=self.loop)
+            while True:
+                msg = yield from stream.read()
+                if msg is None:
+                    break
+                self.assertEqual(msg.status_code, 204)
 
         self.loop.run_until_complete(go())
 

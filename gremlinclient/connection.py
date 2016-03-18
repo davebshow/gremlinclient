@@ -318,18 +318,18 @@ class Stream(object):
                     try:
                         message = self._process(message)
                     except Exception as e:
-                        error = Exception(e.args[0])
+                        exc = e
                         if self._force_close:
                             # throws error asyncio.Cancelled ...
                             future_close = self._conn.close()
                             future_close.add_done_callback(
-                                lambda f: future.set_exception(error))
+                                lambda f: future.set_exception(exc))
                         elif self._force_release:
                             future_release = self._conn.release()
                             future_release.add_done_callback(
-                                lambda f: future.set_exception(e))
+                                lambda f: future.set_exception(exc))
                         else:
-                            future.set_exception(e)
+                            future.set_exception(exc)
                     else:
                         if status_code == 206:
                             terminate = False

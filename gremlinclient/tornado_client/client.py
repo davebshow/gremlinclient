@@ -217,7 +217,7 @@ def submit(url,
                           loop=loop,
                           future_class=future_class,
                           request_factory=request_factory)
-    return _submit(url, gremlin, graph, bindings=None, lang=lang,
+    return _submit(url, gremlin, graph, bindings=bindings, lang=lang,
                    aliases=aliases, op=op, processor=processor,
                    timeout=timeout, session=session, loop=loop,
                    username=username, password=password,

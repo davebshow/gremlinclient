@@ -54,7 +54,7 @@ Don't forget to use the "wss" protocol.
 To set up SSL with :py:mod:`tornado_client<gremlinclient.tornado_client.client>`,
 we create a :py:func:`request_factory` that creates
 :py:class:`HTTPRequest<tornado.httpclient.HTTPRequest>` objects with the
-:py:class:`ssl.SSLContext` as a frozen kwarg::
+:py:class:`ssl.SSLContext` as a frozen kwarg and use this as our ``connector``::
 
     >>> from functools import partial
     >>> request_factory = partial(
@@ -67,7 +67,7 @@ Then pass this object as a kwarg to
 or :py:class:`Pool<gremlinclient.tornado_client.client.Pool>`::
 
     >>> stream = yield from submit(
-    ...     "wss://localhost:8182/", "1 + 1", request_factory=request_factory)
+    ...     "wss://localhost:8182/", "1 + 1", connector=request_factory)
 
 Again, don't forget to use the "wss" protocol.
 

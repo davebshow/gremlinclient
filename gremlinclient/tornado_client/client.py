@@ -84,19 +84,19 @@ class GraphDatabase(GraphDatabase):
     :param class future_class: type of Future -
         :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
         :py:class:`tornado.concurrent.Future`
-    :param func request_factory: a factory for generating
+    :param func connector: a factory for generating
         :py:class:`tornado.HTTPRequest` objects. used with ssl
     """
     def __init__(self, url, timeout=None, username="", password="",
-                 loop=None, future_class=None, request_factory=None):
+                 loop=None, future_class=None, connector=None):
         if future_class is None:
             future_class = concurrent.Future
         super(GraphDatabase, self).__init__(
             url, timeout=timeout, username=username, password=password,
             loop=loop, future_class=future_class)
-        if request_factory is None:
-            request_factory = HTTPRequest
-        self._request_factory = request_factory
+        if connector is None:
+            connector = HTTPRequest
+        self._connector = connector
 
     def _connect(self,
                  conn_type,
@@ -105,7 +105,7 @@ class GraphDatabase(GraphDatabase):
                  force_release,
                  pool):
         future = self._future_class()
-        request = self._request_factory(self._url)
+        request = self._connector(self._url)
         if self._timeout:
             future_conn = with_timeout(timeout, websocket_connect(request))
         else:
@@ -151,19 +151,19 @@ class Pool(Pool):
     :param class future_class: type of Future -
         :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
         :py:class:`tornado.concurrent.Future`
-    :param func request_factory: a factory for generating
+    :param func connector: a factory for generating
         :py:class:`tornado.HTTPRequest` objects. used with ssl
     """
     def __init__(self, url, graph=None, timeout=None, username="",
                  password="", maxsize=256, loop=None, force_release=False,
-                 log_level=WARNING, future_class=None, request_factory=None):
+                 log_level=WARNING, future_class=None, connector=None):
         graph = GraphDatabase(url,
                               timeout=timeout,
                               username=username,
                               password=password,
                               future_class=future_class,
                               loop=loop,
-                              request_factory=request_factory)
+                              connector=connector)
         super(Pool, self).__init__(graph, maxsize=maxsize, loop=loop,
                                    log_level=log_level,
                                    force_release=force_release,
@@ -183,7 +183,7 @@ def submit(url,
            username="",
            password="",
            future_class=None,
-           request_factory=None):
+           connector=None):
     """
     Submit a script to the Gremlin Server.
 
@@ -206,7 +206,7 @@ def submit(url,
     :param class future_class: type of Future -
         :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
         :py:class:`tornado.concurrent.Future`
-    :param func request_factory: a factory for generating
+    :param func connector: a factory for generating
         :py:class:`tornado.HTTPRequest` objects. used with ssl
     :returns: :py:class:`gremlinclient.connection.Stream` object:
     """
@@ -216,7 +216,7 @@ def submit(url,
                           password=password,
                           loop=loop,
                           future_class=future_class,
-                          request_factory=request_factory)
+                          connector=connector)
     return _submit(url, gremlin, graph, bindings=bindings, lang=lang,
                    aliases=aliases, op=op, processor=processor,
                    timeout=timeout, session=session, loop=loop,
@@ -226,7 +226,7 @@ def submit(url,
 
 def create_connection(url, timeout=None, username="", password="",
                       loop=None, session=None, force_close=False,
-                      future_class=None, request_factory=None):
+                      future_class=None, connector=None):
     """
     Get a database connection from the Gremlin Server.
 
@@ -242,7 +242,7 @@ def create_connection(url, timeout=None, username="", password="",
         :py:class:`asyncio.Future`, :py:class:`trollius.Future`, or
         :py:class:`tornado.concurrent.Future`
     :param str session: Session id (optional). Typically a uuid
-    :param func request_factory: a factory for generating
+    :param func connector: a factory for generating
         :py:class:`tornado.HTTPRequest` objects. used with ssl
     :returns: :py:class:`gremlinclient.connection.Connection` object:
     """
@@ -252,7 +252,7 @@ def create_connection(url, timeout=None, username="", password="",
                           password=password,
                           loop=loop,
                           future_class=future_class,
-                          request_factory=request_factory)
+                          connector=connector)
     return _create_connection(url, graph,
                               timeout=timeout,
                               username=username,

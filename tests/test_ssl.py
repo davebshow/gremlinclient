@@ -65,7 +65,7 @@ class TornadoSSLTest(AsyncTestCase):
             httpclient.HTTPRequest, ssl_options=sslcontext)
         stream = yield torsubmit(
             "wss://localhost:8182/", "1 + 1", password="password",
-            username="stephen", request_factory=request_factory)
+            username="stephen", connector=request_factory)
         while True:
             msg = yield stream.read()
             if msg is None:

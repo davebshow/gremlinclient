@@ -446,8 +446,8 @@ class TornadoAPITests(AsyncTestCase):
     @gen_test
     def test_submit(self):
         stream = yield submit(
-            "ws://localhost:8182/", "1 + 1", password="password",
-            username="stephen")
+            "ws://localhost:8182/", "x + x", bindings={"x": 1},
+            password="password", username="stephen")
         while True:
             msg = yield stream.read()
             if msg is None:

@@ -576,8 +576,8 @@ class AsyncioAPITests(unittest.TestCase):
         @asyncio.coroutine
         def go():
             stream = yield from submit(
-                "ws://localhost:8182/", "1 + 1", password="password",
-                username="stephen", loop=self.loop, future_class=Future)
+                "ws://localhost:8182/", "x + x", bindings={"x": 1},
+                password="password", username="stephen", future_class=Future)
             while True:
                 msg = yield from stream.read()
                 if msg is None:

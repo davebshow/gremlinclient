@@ -571,7 +571,7 @@ class TrolliusAPITests(unittest.TestCase):
         def go():
             stream = yield From(submit(
                 "ws://localhost:8182/", "x + x", bindings={"x": 1},
-                password="password", username="stephen", loop=self.loop
+                password="password", username="stephen", loop=self.loop,
                 future_class=Future))
             while True:
                 msg = yield From(stream.read())

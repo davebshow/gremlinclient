@@ -1,7 +1,6 @@
 import uuid
 import unittest
 from datetime import timedelta
-from logging import DEBUG
 
 import tornado
 from tornado import gen
@@ -12,9 +11,6 @@ from tornado.testing import gen_test, AsyncTestCase
 from gremlinclient.connection import Stream
 from gremlinclient.tornado_client import (
     submit, GraphDatabase, Pool, create_connection, Response)
-
-
-LOG_LEVEL = DEBUG
 
 
 class TornadoFactoryConnectTest(AsyncTestCase):
@@ -145,8 +141,7 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password",
-                    log_level=LOG_LEVEL)
+                    password="password")
         connection = yield pool.acquire()
         conn = connection.conn
         self.assertFalse(conn.closed)
@@ -168,8 +163,7 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password",
-                    log_level=LOG_LEVEL)
+                    password="password")
         connection = yield pool.acquire()
         resp = connection.send("1 + 1")
         while True:
@@ -185,8 +179,7 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password",
-                    log_level=LOG_LEVEL)
+                    password="password")
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         c3 = pool.acquire()
@@ -201,8 +194,7 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password",
-                    log_level=LOG_LEVEL)
+                    password="password")
         self.assertEqual(len(pool.pool), 0)
         c1 = yield pool.acquire()
         self.assertEqual(len(pool._acquired), 1)
@@ -215,8 +207,7 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password",
-                    log_level=LOG_LEVEL)
+                    password="password")
         c1 = yield pool.acquire()
         yield pool.release(c1)
         c2 = yield pool.acquire()
@@ -227,12 +218,10 @@ class TornadoPoolTest(AsyncTestCase):
         pool1 = Pool("ws://localhost:8182/",
                      maxsize=2,
                      username="stephen",
-                     password="password",
-                     log_level=LOG_LEVEL)
+                     password="password")
         pool2 = Pool("ws://localhost:8182/",
                      username="stephen",
-                     password="password",
-                     log_level=LOG_LEVEL)
+                     password="password")
         conn1 = yield pool1.acquire()
         conn2 = yield pool2.acquire()
         conn3 = yield pool2.acquire()
@@ -248,8 +237,7 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password",
-                    log_level=LOG_LEVEL)
+                    password="password")
         self.assertEqual(len(pool.pool), 0)
         c1 = yield pool.acquire()
         self.assertEqual(len(pool._acquired), 1)
@@ -264,8 +252,7 @@ class TornadoPoolTest(AsyncTestCase):
                     maxsize=2,
                     username="stephen",
                     password="password",
-                    force_release=True,
-                    log_level=LOG_LEVEL)
+                    force_release=True)
         self.assertEqual(len(pool.pool), 0)
         c1 = yield pool.acquire()
         self.assertEqual(len(pool._acquired), 1)
@@ -279,8 +266,7 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password",
-                    log_level=LOG_LEVEL)
+                    password="password")
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         c3 = pool.acquire()
@@ -299,8 +285,7 @@ class TornadoPoolTest(AsyncTestCase):
         pool = Pool("ws://localhost:8182/",
                     maxsize=2,
                     username="stephen",
-                    password="password",
-                    log_level=LOG_LEVEL)
+                    password="password")
         c1 = yield pool.acquire()
         c2 = yield pool.acquire()
         yield pool.release(c2)

@@ -164,10 +164,10 @@ class GraphDatabase(GraphDatabase):
 class Pool(Pool):
     def __init__(self, url, timeout=None, username="", password="",
                  maxsize=256, loop=None, force_release=False,
-                 log_level=WARNING, future_class=None):
+                 future_class=None):
         super().__init__(url, timeout=timeout, username=username,
                          password=password, graph_class=GraphDatabase,
-                         maxsize=maxsize, loop=loop, log_level=log_level)
+                         maxsize=maxsize, loop=loop)
 
     def close(self):
         self._graph.close()

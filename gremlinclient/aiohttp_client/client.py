@@ -179,9 +179,8 @@ class Pool(Pool):
         object. used with ssl
     """
     def __init__(self, url, timeout=None, username="", password="",
-                 maxsize=256, loop=None, log_level=WARNING,
-                 future_class=None, force_release=False,
-                 connector=None):
+                 maxsize=256, loop=None, future_class=None,
+                 force_release=False, connector=None):
         graph = GraphDatabase(url,
                               timeout=timeout,
                               username=username,
@@ -190,7 +189,6 @@ class Pool(Pool):
                               loop=loop,
                               connector=connector)
         super(Pool, self).__init__(graph, maxsize=maxsize, loop=loop,
-                                   log_level=log_level,
                                    force_release=force_release,
                                    future_class=future_class)
 

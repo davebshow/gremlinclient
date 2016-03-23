@@ -33,18 +33,21 @@ Okay, both `aiohttp`_ and `Tornado`_ use Python's :py:mod:`ssl` module to create
 -------------------------------------------------------------
 
 To set up SSL with :py:mod:`aiohttp_client<gremlinclient.aiohttp_client.client>`,
-use the :py:class:`aiohttp.TCPConnector` class::
+we create a :py:func:`request_factory` that creates
+:py:class:`aiohttp.TCPConnector` class::
 
-    >>> connector = aiohttp.TCPConnector(ssl_context=sslcontext)
+    >>> from functools import partial
+    >>> connector_factory = partial(
+    ...     aiohttp.TCPConnector, ssl_context=sslcontext)
 
-Then pass this object as a kwarg to
+Then pass this as a kwarg to
 :py:func:`submit<gremlinclient.aiohttp_client.client.submit>`,
 :py:func:`create_connection<gremlinclient.aiohttp_client.client.create_connection>`,
 :py:class:`GraphDatabase<gremlinclient.aiohttp_client.client.GraphDatabase>`,
 or :py:class:`Pool<gremlinclient.aiohttp_client.client.Pool>`::
 
     >>> stream = yield from submit(
-    ...     "wss://localhost:8182/", "1 + 1", connector=connector)
+    ...     "wss://localhost:8182/", "1 + 1", connector=connector_factory)
 
 Don't forget to use the "wss" protocol.
 

@@ -117,13 +117,12 @@ class GraphDatabase(GraphDatabase):
 
     def __init__(self, url, timeout=None, username="", password="",
                  loop=None, future_class=None, connector=None):
-        loop = loop or asyncio.get_event_loop()
         future_class = functools.partial(asyncio.Future, loop=loop)
         super().__init__(url, timeout=timeout, username=username,
                          password=password, loop=loop,
                          future_class=future_class)
         if connector is None:
-                connector = aiohttp.TCPConnector(loop=self._loop)
+            connector = aiohttp.TCPConnector
         self._connector = connector
 
     def _connect(self,
@@ -133,12 +132,15 @@ class GraphDatabase(GraphDatabase):
                  force_release,
                  pool):
         future = self._future_class()
-        ws = aiohttp.ws_connect(
-            self._url, connector=self._connector, loop=self._loop)
-        # if self._timeout:
-        #     future_conn = asyncio.wait_for(ws, self._timeout, loop=self._loop)
-        # else:
-        future_conn = asyncio.async(ws, loop=self._loop)
+        connector = self._connector(loop=self._loop)
+        loop = connector._loop
+        client_session = aiohttp.ClientSession(connector=connector, loop=loop)
+        ws = aiohttp.client._DetachedWSRequestContextManager(
+                client_session.ws_connect(self._url), session=client_session)
+        if self._timeout:
+            future_conn = asyncio.wait_for(ws, self._timeout, loop=self._loop)
+        else:
+            future_conn = asyncio.async(ws, loop=self._loop)
 
         def on_connect(f):
             try:
@@ -180,7 +182,6 @@ class Pool(Pool):
                  maxsize=256, loop=None, log_level=WARNING,
                  future_class=None, force_release=False,
                  connector=None):
-        loop = loop or asyncio.get_event_loop()
         graph = GraphDatabase(url,
                               timeout=timeout,
                               username=username,

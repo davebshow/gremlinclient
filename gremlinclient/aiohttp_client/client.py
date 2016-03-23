@@ -122,7 +122,7 @@ class GraphDatabase(GraphDatabase):
                          password=password, loop=loop,
                          future_class=future_class)
         if connector is None:
-            connector = aiohttp.TCPConnector
+            connector = aiohttp.TCPConnector(loop=self._loop)
         self._connector = connector
 
     def _connect(self,
@@ -132,11 +132,10 @@ class GraphDatabase(GraphDatabase):
                  force_release,
                  pool):
         future = self._future_class()
-        connector = self._connector(loop=self._loop)
-        loop = connector._loop
-        client_session = aiohttp.ClientSession(connector=connector, loop=loop)
-        ws = aiohttp.client._DetachedWSRequestContextManager(
-                client_session.ws_connect(self._url), session=client_session)
+        loop = self._connector._loop
+        ws = aiohttp.ws_connect(
+            self._url, connector=self._connector, loop=loop)
+
         if self._timeout:
             future_conn = asyncio.wait_for(ws, self._timeout, loop=self._loop)
         else:

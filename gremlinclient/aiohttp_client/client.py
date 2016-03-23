@@ -135,10 +135,10 @@ class GraphDatabase(GraphDatabase):
         future = self._future_class()
         ws = aiohttp.ws_connect(
             self._url, connector=self._connector, loop=self._loop)
-        if self._timeout:
-            future_conn = asyncio.wait_for(ws, self._timeout, loop=self._loop)
-        else:
-            future_conn = asyncio.async(ws, loop=self._loop)
+        # if self._timeout:
+        #     future_conn = asyncio.wait_for(ws, self._timeout, loop=self._loop)
+        # else:
+        future_conn = asyncio.async(ws, loop=self._loop)
 
         def on_connect(f):
             try:

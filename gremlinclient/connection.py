@@ -81,7 +81,7 @@ class Connection(object):
 
     def send(self, gremlin, bindings=None, lang="gremlin-groovy",
                aliases=None, op="eval", processor="", session=None,
-               timeout=None, handler=None):
+               timeout=None, handler=None, request_id=None):
         """
         Send a script to the Gremlin Server.
 
@@ -107,8 +107,14 @@ class Connection(object):
             timeout = self._timeout
         if aliases is None:
             aliases = {}
-        message = self._prepare_message(
-            gremlin, bindings, lang, aliases, op, processor, session)
+        message = self._prepare_message(gremlin,
+                                        bindings,
+                                        lang,
+                                        aliases,
+                                        op,
+                                        processor,
+                                        session,
+                                        request_id)
 
         self.conn.send(message, binary=True)
 
@@ -125,8 +131,10 @@ class Connection(object):
 
     def _prepare_message(self, gremlin, bindings, lang, aliases, op, processor,
                          session):
+        if request_id is None:
+            request_id = str(uuid.uuid4())
         message = {
-            "requestId": str(uuid.uuid4()),
+            "requestId": request_id,
             "op": op,
             "processor": processor,
             "args": {

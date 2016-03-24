@@ -130,7 +130,7 @@ class Connection(object):
                       self._future_class)
 
     def _prepare_message(self, gremlin, bindings, lang, aliases, op, processor,
-                         session):
+                         session, request_id):
         if request_id is None:
             request_id = str(uuid.uuid4())
         message = {

@@ -27,7 +27,7 @@ class Pool(object):
         :py:class:`tornado.concurrent.Future`
     """
     def __init__(self, graph, maxsize=256, loop=None, force_release=False,
-                 log_level=WARNING, future_class=None):
+                 future_class=None):
         self._graph = graph
         self._maxsize = maxsize
         self._pool = collections.deque()
@@ -38,7 +38,6 @@ class Pool(object):
         self._loop = loop
         self._force_release = force_release
         self._future_class = self._graph.future_class
-        pool_logger.setLevel(log_level)
 
     @property
     def freesize(self):

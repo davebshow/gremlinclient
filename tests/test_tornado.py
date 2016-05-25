@@ -310,6 +310,16 @@ class TornadoPoolTest(AsyncTestCase):
         c1.close()
         c2.close()
 
+    @gen_test
+    def test_future_class(self):
+        pool = Pool(url="ws://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password")
+
+        self.assertTrue(hasattr(pool, 'future_class'))
+        self.assertEqual(pool.future_class, Future)
+
 
 # class TornadoCtxtMngrTest(AsyncTestCase):
     #

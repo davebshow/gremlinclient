@@ -93,6 +93,14 @@ class Pool(object):
         """
         return self._closed or self._graph is None
 
+    @property
+    def future_class(self):
+        """
+        :return: :py:class:`type`
+            Concrete class of the future instances created by this pool, for example :py:class: `asyncio.Future`
+        """
+        return self._future_class
+
     def acquire(self):
         # maybe have max connection open time here
         """

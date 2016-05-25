@@ -417,6 +417,17 @@ class AsyncioPoolTest(unittest.TestCase):
 
         self.loop.run_until_complete(go())
 
+    def test_future_class(self):
+        pool = Pool(url="ws://localhost:8182/",
+                    maxsize=2,
+                    username="stephen",
+                    password="password",
+                    loop=self.loop,
+                    future_class=Future)
+
+        self.assertTrue(hasattr(pool, 'future_class'))
+        self.assertEqual(pool.future_class, Future)
+
 # class AsyncioCtxtMngrTest(unittest.TestCase):
 #
 #     def setUp(self):

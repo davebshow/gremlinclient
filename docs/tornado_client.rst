@@ -18,3 +18,11 @@ tornado_client.client module
     :members:
     :undoc-members:
     :show-inheritance:
+
+tornado_client.remote_connection module
+----------------------------
+
+.. automodule:: gremlinclient.tornado_client.remote_connection
+    :members:
+    :undoc-members:
+    :show-inheritance:

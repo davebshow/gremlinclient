@@ -85,6 +85,32 @@ Automatically release connections to :py:class:`Pool<gremlinclient.tornado_clien
 
 For more info, see the :ref:`Tornado Client docs<tornado-client>`
 
+The :py:class:`RemoteConnection` object
+---------------------------------------
+
+The remote connection object provides a synchronous interface designed to be
+used with the official TinkerPop `Gremlin-Python Gremlin Language Variant (GLV)`_:
+
+    >>> from gremlin_python import PythonGraphTraversalSource, GroovyTranslator  # imports may change after packaging
+    >>> from gremlinclient.tornado_client import RemoteConnection
+    >>> remote_conn = RemoteConnection("ws://localhost:8182/")
+    >>> translator = GroovyTranslator("g")
+    >>> g = PythonGraphTraversalSource(translator,
+    ...                                remote_connection=remote_conn)
+
+This allows you to write Gremlin traversals using pure Python!:
+
+    >>> g.addV('person').property('name','stephen').next()
+    >>> g.V().toList()
+
+Remember to call :py:meth:`next` or :py:meth:`toList` to submit the traversal to
+the server.
+
+For more info see
+:py:class:`aiohttp_client.RemoteConnection<gremlinclient.aiohttp_client.remote_connection.RemoteConnection>`
+and :py:class:`tornado_client.RemoteConnection<gremlinclient.tornado_client.remote_connection.RemoteConnection>`
+
 
 .. _Gremlin Server: http://tinkerpop.incubator.apache.org/
 .. _PEP 492: https://www.python.org/dev/peps/pep-0492/
+.. _Gremlin-Python Gremlin Language Variant (GLV): http://tinkerpop.apache.org/docs/3.2.1-SNAPSHOT/tutorials/gremlin-language-variants/

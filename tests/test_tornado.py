@@ -10,7 +10,31 @@ from tornado.testing import gen_test, AsyncTestCase
 
 from gremlinclient.connection import Stream
 from gremlinclient.tornado_client import (
-    submit, GraphDatabase, Pool, create_connection, Response)
+    submit, GraphDatabase, Pool, create_connection, Response, RemoteConnection)
+
+from gremlin_python import PythonGraphTraversalSource, GroovyTranslator
+
+
+class RemoteConnectionTest(unittest.TestCase):
+
+    def setUp(self):
+        super(RemoteConnectionTest, self).setUp()
+        self.conn = RemoteConnection("ws://localhost:8182/")
+
+    def tearDown(self):
+        super(RemoteConnectionTest, self).tearDown()
+        self.conn.close()
+
+    def test_submit(self):
+        result = self.conn.submit("gremlin-groovy", "x + x", bindings={"x": 1})
+        result = list(result)
+        self.assertEqual(result[0].object, 2)
+
+    def test_traversal(self):
+        g = PythonGraphTraversalSource(GroovyTranslator("g"),
+                                       remote_connection=self.conn)
+        node = g.addV('person').property('name','stephen').next()
+        self.assertTrue(node['properties']['name'][0]['value'], 'stephen')
 
 
 class TornadoFactoryConnectTest(AsyncTestCase):
